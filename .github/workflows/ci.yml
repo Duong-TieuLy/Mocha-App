@@ -18,7 +18,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0'  # thay bằng version bạn đang dùng
+          flutter-version: '3.35.6'  # thay bằng version bạn đang dùng
 
       - name: Get dependencies
         working-directory: frontend
