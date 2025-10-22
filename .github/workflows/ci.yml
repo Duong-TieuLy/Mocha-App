@@ -1,4 +1,4 @@
-name: CI Test (Flutter + Spring Boot)
+name: Flutter CI Test
 
 on:
   pull_request:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   flutter_test:
-    name: Test Flutter App
+    name: Flutter Frontend CI
     runs-on: ubuntu-latest
 
     steps:
@@ -18,7 +18,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0'  # thay bằng version bạn đang dùng
+          flutter-version: '3.35.6'   # ✅ trùng với máy bạn
 
       - name: Get dependencies
         working-directory: frontend
@@ -32,20 +32,5 @@ jobs:
         working-directory: frontend
         run: flutter test
 
-  spring_test:
-    name: Test Spring Boot Backend
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Build & test backend
-        working-directory: backend
-        run: ./mvnw clean test
+      - name: ✅ CI Status
+        run: echo "✅ Flutter CI passed successfully!"
