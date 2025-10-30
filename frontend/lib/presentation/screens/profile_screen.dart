@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/presentation/screens/post_card.dart';
+import 'package:frontend/presentation/screens/scrollable_tab.dart';
 
 class ProfilePage extends StatefulWidget {
   // final String name;
@@ -22,6 +24,34 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final List<PostCard> myAllPosts = const [
+    PostCard(
+      name: "Vĩ Ân Trần",
+      username: "@vian",
+      image: "https://picsum.photos/400",
+      comments: 5,
+      likes: 12,
+    ),
+    PostCard(
+      name: "Hana",
+      username: "@hana",
+      image: "https://picsum.photos/401",
+      comments: 3,
+      likes: 8,
+    ),
+  ];
+
+  final List<PostCard> myPhotoPosts = const [
+    PostCard(
+      name: "Hana",
+      username: "@hana",
+      image: "https://picsum.photos/402",
+      comments: 2,
+      likes: 6,
+    ),
+  ];
+
+  final List<PostCard> myVideoPosts = const []; // chưa có video
 
   @override
   void initState() {
@@ -175,10 +205,10 @@ class _ProfilePageState extends State<ProfilePage>
         },
         //Nội dung cuộn (tab view)
         body: Container(
-          padding: const EdgeInsets.only(top: 10),
-          decoration: const BoxDecoration(
-            color: Color.fromRGBO(121, 171, 222, 1), //Giữ màu xanh này
-          ),
+          constraints: BoxConstraints.expand(),
+          width: double.infinity,
+          height: double.infinity,
+          // color: const Color.fromRGBO(121, 171, 222, 1),
           child:  Column(
             children: [
               Container(
@@ -186,6 +216,7 @@ class _ProfilePageState extends State<ProfilePage>
                 child: TabBar(
                   controller: _tabController,
                   indicatorColor: Colors.black,
+                  dividerColor: Colors.transparent,
                   labelColor: Colors.black,
                   unselectedLabelColor: Colors.black45,
                   labelStyle: const TextStyle(
@@ -199,26 +230,37 @@ class _ProfilePageState extends State<ProfilePage>
                   ],
                 ),
               ),
-
-              // TabBarView (phần nội dung cuộn)
               Expanded(
                 child: Container(
                   decoration: const BoxDecoration(
-                    color: Colors.white,
+                    gradient: LinearGradient(
+                      colors: [
+                        Color.fromRGBO(231, 231, 231, 0.5),
+                        Color.fromRGBO(121, 171, 222, 1),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
                     borderRadius: BorderRadius.only(
                       topLeft: Radius.circular(16),
                       topRight: Radius.circular(16),
                     ),
                   ),
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: const [
-                      _ScrollableTab(title: "No posts yet"),
-                      _ScrollableTab(title: "No photos yet"),
-                      _ScrollableTab(title: "No videos yet"),
-                    ],
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          ScrollableTab(items: myAllPosts),
+                          ScrollableTab(items: myPhotoPosts),
+                          ScrollableTab(items: myVideoPosts),
+                         ],
+                        ),
+                      )
+                    ]
                   ),
-                )
+                ),
               ),
             ],
           ),
@@ -226,46 +268,6 @@ class _ProfilePageState extends State<ProfilePage>
       ),
     );
   }
-}
-
-class _ScrollableTab extends StatelessWidget {
-  final String title;
-  const _ScrollableTab({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    final List<String> items = []; // 👈 nếu rỗng thì hiện "Empty Folder"
-
-    if (items.isEmpty) {
-      return const Center(
-        child: Text(
-          "Empty Folder",
-          style: TextStyle(
-            color: Colors.black54,
-            fontSize: 16,
-          ),
-        ),
-      );
-    }
-
-    // Nếu có dữ liệu -> ListView
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: items.length,
-      itemBuilder: (context, index) => Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        height: 100,
-        decoration: BoxDecoration(
-          color: Colors.grey[200],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Center(
-          child: Text(items[index]),
-        ),
-      ),
-    );
-  }
-
 }
 
 class _FollowInfo extends StatelessWidget {
