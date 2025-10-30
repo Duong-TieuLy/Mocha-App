@@ -82,10 +82,14 @@ class CompleteProfileScreen extends StatelessWidget {
                     child: const Text("Next", style: TextStyle(fontSize: 16)),
                   ),
                   const SizedBox(height: 12),
-                  const Text("Skip for now",
+                  TextButton(onPressed: ()=> Navigator.pushNamed(context, '/home'),
+                    child: const Text("Skip for now",
                       style: TextStyle(
                           color: Colors.black54,
-                          fontStyle: FontStyle.italic)),
+                          fontStyle: FontStyle.italic
+                      )
+                    ),
+                  )
                 ],
               ),
             ),

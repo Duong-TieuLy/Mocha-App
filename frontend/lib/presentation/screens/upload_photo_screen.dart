@@ -48,7 +48,7 @@ class UploadPhotoScreen extends StatelessWidget {
                       style: TextStyle(fontSize: 16)),
                   const SizedBox(height: 32),
                   ElevatedButton(
-                    onPressed: () {},
+                    onPressed: ()=> Navigator.pushNamed(context, '/home'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2196F3),
                       shape: RoundedRectangleBorder(
@@ -59,10 +59,14 @@ class UploadPhotoScreen extends StatelessWidget {
                     child: const Text("Complete", style: TextStyle(fontSize: 16)),
                   ),
                   const SizedBox(height: 12),
-                  const Text("Skip for now",
-                      style: TextStyle(
-                          color: Colors.black54,
-                          fontStyle: FontStyle.italic)),
+                  TextButton(onPressed: ()=> Navigator.pushNamed(context, '/home'),
+                    child: const Text("Skip for now",
+                        style: TextStyle(
+                            color: Colors.black54,
+                            fontStyle: FontStyle.italic
+                        )
+                    ),
+                  )
                 ],
               ),
             ),
