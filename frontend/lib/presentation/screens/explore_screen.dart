@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:frontend/presentation/screens/post_card.dart';
 class ExplorePage extends StatelessWidget {
   const ExplorePage({super.key});
 
@@ -76,71 +76,23 @@ class ExplorePage extends StatelessWidget {
             ),
             ),
             // 🔹 Example Post Card
-            postCard("Damian", "@Damian12",
-                "https://images.unsplash.com/photo-1501785888041-af3ef285b470", 10, 252),
+            PostCard(name: "Damian", username: "@Damian12",
+                image: "https://images.unsplash.com/photo-1501785888041-af3ef285b470", likes: 10, comments: 252),
 
-            postCard("Katherine", "@Kiyyu23",
-                "https://images.unsplash.com/photo-1507525428034-b723cf961d3e", 0, 0),
-            postCard("Damian", "@Damian12",
-                "https://images.unsplash.com/photo-1501785888041-af3ef285b470", 10, 252),
+            PostCard(name: "Katherine", username: "@Kiyyu23",
+                image:"https://images.unsplash.com/photo-1507525428034-b723cf961d3e", likes: 10,  comments: 250),
+            PostCard(name: "Damian", username: "@Damian12",
+                image: "https://images.unsplash.com/photo-1501785888041-af3ef285b470", likes: 10, comments: 252),
+            PostCard(name: "Damian", username: "@Damian12",
+                image: "https://images.unsplash.com/photo-1501785888041-af3ef285b470", likes: 10, comments: 252),
 
-            postCard("Katherine", "@Kiyyu23",
-                "https://images.unsplash.com/photo-1507525428034-b723cf961d3e", 0, 0),
-            postCard("Damian", "@Damian12",
-                "https://images.unsplash.com/photo-1501785888041-af3ef285b470", 10, 252),
-
-            postCard("Katherine", "@Kiyyu23",
-                "https://images.unsplash.com/photo-1507525428034-b723cf961d3e", 0, 0),
+            PostCard(name: "Katherine", username: "@Kiyyu23",
+                image:"https://images.unsplash.com/photo-1507525428034-b723cf961d3e", likes: 10,  comments: 250),
+            PostCard(name: "Damian", username: "@Damian12",
+                image: "https://images.unsplash.com/photo-1501785888041-af3ef285b470", likes: 10, comments: 252),
           ],
         ),
       )
-    );
-  }
-
-  Widget postCard(String name, String username, String image, int comments, int likes) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.blue.shade100,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Colors.white,
-                radius: 22,
-                child: Icon(Icons.person, color: Colors.black),
-              ),
-              title: Text(name,
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-              subtitle: Text(username, style: const TextStyle(color: Colors.black54)),
-            ),
-            // Image
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
-              child: Image.network(image, fit: BoxFit.cover, height: 200, width: double.infinity),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Row(
-                children: [
-                  const Icon(Icons.comment_outlined, color: Colors.black54),
-                  const SizedBox(width: 4),
-                  Text("$comments"),
-                  const SizedBox(width: 16),
-                  const Icon(Icons.favorite_border, color: Colors.black54),
-                  const SizedBox(width: 4),
-                  Text("$likes"),
-                ],
-              ),
-            )
-          ],
-        ),
-      ),
     );
   }
 }
