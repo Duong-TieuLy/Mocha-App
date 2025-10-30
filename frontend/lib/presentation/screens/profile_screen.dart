@@ -260,7 +260,7 @@ class _ScrollableTab extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Center(
-          child: Text("${items[index]}"),
+          child: Text(items[index]),
         ),
       ),
     );

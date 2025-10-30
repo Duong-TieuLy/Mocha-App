@@ -4,7 +4,9 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e111d3a9-b8d2-457e-a489-84253a9ac315" name="Changes" comment="" />
+    <list default="true" id="e111d3a9-b8d2-457e-a489-84253a9ac315" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/frontend/lib/presentation/screens/profile_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/presentation/screens/profile_screen.dart" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
