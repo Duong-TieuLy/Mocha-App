@@ -5,11 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="e111d3a9-b8d2-457e-a489-84253a9ac315" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/lib/presentation/screens/login_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/presentation/screens/login_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/lib/presentation/screens/signup_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/presentation/screens/signup_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/lib/presentation/screens/splash_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/presentation/screens/splash_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/lib/chat/chat_list_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/lib/chat/chat_list_screen.dart" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -77,11 +74,6 @@
       <option name="filePath" value="$PROJECT_DIR$/frontend/lib/main.dart" />
       <method v="2" />
     </configuration>
-    <recent_temporary>
-      <list>
-        <item itemvalue="Flutter.main.dart" />
-      </list>
-    </recent_temporary>
   </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
