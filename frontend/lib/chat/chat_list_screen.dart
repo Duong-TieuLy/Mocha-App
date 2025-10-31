@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 import 'chat_detail_screen.dart';
 
-class ChatListScreen extends StatelessWidget {
+class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
+
+  @override
+  State<ChatListScreen> createState() => _ChatListScreenState();
+}
+
+class _ChatListScreenState extends State<ChatListScreen> {
+  int _selectedTab = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -66,9 +73,23 @@ class ChatListScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                _buildTab('Chats', isSelected: true),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedTab = 0;
+                    });
+                  },
+                  child: _buildTab('Chats', isSelected: _selectedTab == 0),
+                ),
                 const SizedBox(width: 30),
-                _buildTab('Groups', isSelected: false),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedTab = 1;
+                    });
+                  },
+                  child: _buildTab('Groups', isSelected: _selectedTab == 1),
+                ),
               ],
             ),
           ),
@@ -76,52 +97,64 @@ class ChatListScreen extends StatelessWidget {
           const SizedBox(height: 10),
 
           Expanded(
-            child: ListView(
-              children: [
-                _buildChatItem(
-                  context,
-                  'Tommy',
-                  'Typing......',
-                  '9:41 AM',
-                  'assets/images/tommy.png',
-                ),
-                _buildChatItem(
-                  context,
-                  'Bella',
-                  'Typing......',
-                  '9:41 AM',
-                  'assets/images/woman.png',
-                  isTyping: true,
-                ),
-              ],
+            child: _selectedTab == 0 ? _buildChatsList() : _buildEmptyFolder(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChatsList() {
+    return ListView(
+      children: [
+        _buildChatItem(
+          context,
+          'Tommy',
+          'Typing......',
+          '9:41 AM',
+          'assets/images/tommy.png',
+        ),
+        _buildChatItem(
+          context,
+          'Bella',
+          'Typing......',
+          '9:41 AM',
+          'assets/images/woman.png',
+          isTyping: true,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyFolder() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.folder_open_outlined,
+            size: 100,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Empty Folder',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'No groups yet',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey[500],
             ),
           ),
         ],
       ),
-      // bottomNavigationBar: BottomNavigationBar(
-      //   type: BottomNavigationBarType.fixed,
-      //   selectedItemColor: Colors.blue,
-      //   unselectedItemColor: Colors.grey,
-      //   currentIndex: 1,
-      //   items: const [
-      //     BottomNavigationBarItem(
-      //       icon: Icon(Icons.home_outlined),
-      //       label: '',
-      //     ),
-      //     BottomNavigationBarItem(
-      //       icon: Icon(Icons.chat_bubble),
-      //       label: '',
-      //     ),
-      //     BottomNavigationBarItem(
-      //       icon: Icon(Icons.grid_view_rounded),
-      //       label: '',
-      //     ),
-      //     BottomNavigationBarItem(
-      //       icon: Icon(Icons.person_outline),
-      //       label: '',
-      //     ),
-      //   ],
-      // ),
     );
   }
 
@@ -213,8 +246,7 @@ class ChatListScreen extends StatelessWidget {
         radius: 28,
         backgroundColor: Colors.grey[300],
         backgroundImage: AssetImage(imagePath),
-        onBackgroundImageError: (exception, stackTrace) {
-        },
+        onBackgroundImageError: (exception, stackTrace) {},
         child: null,
       ),
       title: Text(
