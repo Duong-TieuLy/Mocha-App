@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "947532662145",
+    "project_id": "mocha-app-bad3f",
+    "storage_bucket": "mocha-app-bad3f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:947532662145:android:eb76ca8ba495b99ffa1480",
+        "android_client_info": {
+          "package_name": "uth.edu.frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDFafBASxoVvZpUAMu_0LOJWQ3Gb3rG5M4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
