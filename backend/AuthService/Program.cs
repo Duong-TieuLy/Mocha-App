@@ -22,7 +22,7 @@ builder.Services.AddCors(options =>
             .AllowCredentials();
         });
 });
-
+builder.Services.AddHttpClient();
 // Chỉ khởi tạo Firebase nếu chưa khởi tạo và file tồn tại
 if (File.Exists("firebase-adminsdk.json") && FirebaseApp.DefaultInstance == null)
 {
