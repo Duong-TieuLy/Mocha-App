@@ -1,6 +1,9 @@
 version: "3.8"
 
 services:
+  # ==========================
+  # Auth Service (.NET)
+  # ==========================
   authservice:
     build:
       context: ./backend/AuthService
@@ -17,6 +20,45 @@ services:
       - mocha-network
 
   # ==========================
+  # User Service (Spring Boot)
+  # ==========================
+  userservice:
+    build:
+      context: ./backend/UserService
+      dockerfile: Dockerfile
+    container_name: userservice
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/UserDB
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=YourStrong@Password123
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_JPA_SHOW_SQL=true
+      - SERVER_PORT=8082
+      - SPRING_APPLICATION_NAME=UserService
+    depends_on:
+      - db
+    networks:
+      - mocha-network
+
+  # ==========================
+  # API Gateway (Ocelot)
+  # ==========================
+  apigateway:
+    build:
+      context: ./backend/ApiGateway
+      dockerfile: Dockerfile
+    container_name: apigateway
+    ports:
+      - "8000:8000"
+    depends_on:
+      - authservice
+      - userservice
+    networks:
+      - mocha-network
+
+  # ==========================
   # MySQL Database
   # ==========================
   db:
@@ -25,6 +67,7 @@ services:
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: YourStrong@Password123
+      MYSQL_DATABASE: AuthDB
     ports:
       - "3306:3306"
     volumes:
@@ -38,6 +81,9 @@ services:
       timeout: 5s
       retries: 10
 
+# ==========================
+# Networks & Volumes
+# ==========================
 networks:
   mocha-network:
     name: mocha-network
