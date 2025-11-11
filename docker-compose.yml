@@ -1,0 +1,47 @@
+version: "3.8"
+
+services:
+  authservice:
+    build:
+      context: ./backend/AuthService
+      dockerfile: Dockerfile
+    container_name: authservice
+    ports:
+      - "8083:8083"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=server=db;port=3306;database=AuthDB;user=root;password=YourStrong@Password123;
+    depends_on:
+      - db
+    networks:
+      - mocha-network
+
+  # ==========================
+  # MySQL Database
+  # ==========================
+  db:
+    image: mysql:8.0
+    container_name: mocha-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: YourStrong@Password123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - mocha-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pYourStrong@Password123"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+networks:
+  mocha-network:
+    name: mocha-network
+    driver: bridge
+
+volumes:
+  mysql-data:

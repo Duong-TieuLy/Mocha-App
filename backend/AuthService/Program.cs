@@ -33,10 +33,18 @@ if (File.Exists("firebase-adminsdk.json") && FirebaseApp.DefaultInstance == null
 }
 
 // Đăng ký DbContext
+// Đăng ký DbContext (MySQL)
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    var serverVersion = new MySqlServerVersion(new Version(8, 0, 36)); // phiên bản MySQL trong docker-compose
+
+    options.UseMySql(connectionString, serverVersion, mySqlOptions =>
+    {
+        mySqlOptions.EnableRetryOnFailure(5, TimeSpan.FromSeconds(10), null);
+    });
 });
+
 
 // Đăng ký Repository
 builder.Services.AddScoped<IAuthUserRepository, AuthUserRepository>();
@@ -47,7 +55,22 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
+    // Tự động migrate nếu có file migration mới
+    try
+    {
+        Console.WriteLine("🗄️ Checking database state...");
+        db.Database.Migrate(); // 👈 Dòng này sẽ tự tạo DB nếu chưa tồn tại
+        Console.WriteLine("✅ Database created or already up to date.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Database migration failed: {ex.Message}");
+    }
+}
 app.UseHttpsRedirection();
 app.UseSwagger();
 app.UseSwaggerUI();
