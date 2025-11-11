@@ -49,9 +49,9 @@ services:
     build:
       context: ./backend/ApiGateway
       dockerfile: Dockerfile
-    container_name: apigateway
+    container_name: apigateway-mocha
     ports:
-      - "8000:8000"
+      - "8000:8080"
     depends_on:
       - authservice
       - userservice
