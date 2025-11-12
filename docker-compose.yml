@@ -41,6 +41,28 @@ services:
       - db
     networks:
       - mocha-network
+ # ==========================
+  # Post Service (Spring Boot)
+  # ==========================
+  postservice:
+    build:
+      context: ./backend/PostService
+      dockerfile: Dockerfile
+    container_name: postservice
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/PostDB
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=YourStrong@Password123
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_JPA_SHOW_SQL=true
+      - SERVER_PORT=8081
+      - SPRING_APPLICATION_NAME=PostService
+    depends_on:
+      - db
+    networks:
+      - mocha-network
 
   # ==========================
   # API Gateway (Ocelot)
