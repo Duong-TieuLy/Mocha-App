@@ -29,7 +29,7 @@
       "DownstreamPathTemplate": "/api/{service}/{everything}",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
-        { "Host": "postservice", "Port": 8082 }
+        { "Host": "postservice", "Port": 8081 }
       ],
       "UpstreamPathTemplate": "/api/{service}/{everything}",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ],
