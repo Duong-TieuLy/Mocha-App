@@ -9,6 +9,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "users")
@@ -53,4 +55,14 @@ public class User {
     // 🔹 Ai đang theo dõi người này
     @ManyToMany(mappedBy = "following")
     private Set<User> followers = new HashSet<>();
+
+    // Quan hệ với Friendship - Lời mời đã gửi
+    @OneToMany(mappedBy = "sender", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference("user-sent-requests")
+    private List<Friend> sentFriendRequests = new ArrayList<>();
+
+    // Quan hệ với Friendship - Lời mời đã nhận
+    @OneToMany(mappedBy = "receiver", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference("user-received-requests")
+    private List<Friend> receivedFriendRequests = new ArrayList<>();
 }

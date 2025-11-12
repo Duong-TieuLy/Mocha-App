@@ -5,6 +5,11 @@ import 'presentation/screens/splash_screen.dart';
 import 'presentation/screens/login_screen.dart';
 import 'presentation/screens/signup_screen.dart';
 
+import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+
+
 // 🟣 Import các màn khác
 import 'presentation/screens/congratulations_screen.dart';
 import 'presentation/screens/complete_profile_screen.dart';
@@ -14,7 +19,11 @@ import 'package:frontend/presentation/screens/moments_screen.dart';
 import 'package:frontend/presentation/screens/profile_screen.dart';
 import 'chat/chat_list_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const MyApp());
 }
 
