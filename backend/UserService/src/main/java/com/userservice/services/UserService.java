@@ -1,5 +1,7 @@
 package com.userservice.services;
 
+import com.userservice.dtos.UserProfileDto;
+import com.userservice.mapper.UserMapper;
 import com.userservice.models.User;
 import com.userservice.repositories.UserRepository;
 import org.springframework.stereotype.Service;
@@ -21,7 +23,12 @@ public class UserService {
     public Optional<User> findByFirebaseUid(String firebaseUid) {
         return userRepository.findByFirebaseUid(firebaseUid);
     }
-
+    /**
+     * Lấy thông tin profile
+     */
+    public Optional<UserProfileDto> getProfileByFirebaseUid(String firebaseUid) {
+        return userRepository.findByFirebaseUid(firebaseUid).map(UserMapper::toProfileDto);
+    }
     /**
      * Cập nhật hồ sơ người dùng
      */
