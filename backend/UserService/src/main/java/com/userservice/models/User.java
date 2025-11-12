@@ -39,6 +39,10 @@ public class User {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
+    private boolean banned = false;
+
+    private String banReason;
+
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
     private UserStatus status;

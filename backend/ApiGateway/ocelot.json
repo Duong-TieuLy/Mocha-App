@@ -24,6 +24,22 @@
       "DownstreamHeaderTransform": {
         "Authorization": "{Authorization}"
       }
+    },
+    {
+      "DownstreamPathTemplate": "/api/{service}/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        { "Host": "postservice", "Port": 8082 }
+      ],
+      "UpstreamPathTemplate": "/api/{service}/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ],
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      },
+      "DownstreamHeaderTransform": {
+        "Authorization": "{Authorization}"
+      }
     }
   ],
   "GlobalConfiguration": {
