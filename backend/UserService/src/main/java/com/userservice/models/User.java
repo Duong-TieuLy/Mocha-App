@@ -1,6 +1,5 @@
 package com.userservice.models;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -48,22 +47,15 @@ public class User {
     private UserStatus status;
 
     // 🔹 Người này đang theo dõi ai
-    @JsonIgnore
     @ManyToMany
     @JoinTable(
-        name = "user_following",
-        joinColumns = @JoinColumn(name = "follower_id"),
-        inverseJoinColumns = @JoinColumn(name = "following_id")
+            name = "user_following",
+            joinColumns = @JoinColumn(name = "follower_id"),
+            inverseJoinColumns = @JoinColumn(name = "following_id")
     )
     private Set<User> following = new HashSet<>();
 
     // 🔹 Ai đang theo dõi người này
-    @JsonIgnore
-    @ManyToMany
-    @JoinTable(
-        name = "user_following",
-        joinColumns = @JoinColumn(name = "following_id"),
-        inverseJoinColumns = @JoinColumn(name = "follower_id")
-    )
+    @ManyToMany(mappedBy = "following")
     private Set<User> followers = new HashSet<>();
 }
