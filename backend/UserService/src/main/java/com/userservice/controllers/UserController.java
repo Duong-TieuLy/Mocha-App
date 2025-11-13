@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
@@ -15,6 +17,22 @@ public class UserController {
 
     public UserController(UserService service) {
         this.service = service;
+    }
+
+    // Tìm user theo email hoặc tên hiển thị
+    @GetMapping("/search")
+    public ResponseEntity<List<User>> searchUsers(
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) String name) {
+
+        if (email != null) {
+            return service.findByEmail(email)
+                    .map(user -> ResponseEntity.ok(List.of(user)))
+                    .orElse(ResponseEntity.ok(List.of()));
+        } else if (name != null) {
+            return ResponseEntity.ok(service.searchByFullName(name));
+        }
+        return ResponseEntity.ok(List.of());
     }
 
     @GetMapping("/me")
