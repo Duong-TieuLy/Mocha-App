@@ -26,12 +26,12 @@
       }
     },
     {
-      "DownstreamPathTemplate": "/api/{service}/{everything}",
+      "DownstreamPathTemplate": "/api/posts/{everything}",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
         { "Host": "postservice", "Port": 8081 }
       ],
-      "UpstreamPathTemplate": "/api/{service}/{everything}",
+      "UpstreamPathTemplate": "/api/posts/{everything}",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ],
       "AuthenticationOptions": {
         "AuthenticationProviderKey": "Bearer",
