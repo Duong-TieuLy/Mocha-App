@@ -7,6 +7,7 @@ import com.userservice.repositories.UserRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -23,12 +24,17 @@ public class UserService {
     public Optional<User> findByFirebaseUid(String firebaseUid) {
         return userRepository.findByFirebaseUid(firebaseUid);
     }
-    /**
-     * Lấy thông tin profile
-     */
-    public Optional<UserProfileDto> getProfileByFirebaseUid(String firebaseUid) {
-        return userRepository.findByFirebaseUid(firebaseUid).map(UserMapper::toProfileDto);
+
+    // 🔹 Tìm theo email
+    public Optional<User> findByEmail(String email) {
+        return userRepository.findByEmail(email);
     }
+
+    // 🔹 Tìm theo tên hiển thị (fullName)
+    public List<User> searchByFullName(String fullName) {
+        return userRepository.findByFullName(fullName);
+    }
+
     /**
      * Cập nhật hồ sơ người dùng
      */
@@ -40,11 +46,11 @@ public class UserService {
             return u;
         });
 
-        // Cập nhật các trường có thể null-safe
         if (updated.getFullName() != null) user.setFullName(updated.getFullName());
         if (updated.getBio() != null) user.setBio(updated.getBio());
         if (updated.getInterests() != null) user.setInterests(updated.getInterests());
         if (updated.getPhotoUrl() != null) user.setPhotoUrl(updated.getPhotoUrl());
+        if (updated.getEmail() != null) user.setEmail(updated.getEmail()); // ✅ cập nhật email
 
         user.setUpdatedAt(LocalDateTime.now());
         return userRepository.save(user);
@@ -60,6 +66,13 @@ public class UserService {
         }
 
         return userRepository.findByFirebaseUid(newUser.getFirebaseUid())
+                .map(existing -> {
+                    // Cập nhật email và tên nếu có thay đổi
+                    if (newUser.getEmail() != null) existing.setEmail(newUser.getEmail());
+                    if (newUser.getFullName() != null) existing.setFullName(newUser.getFullName());
+                    existing.setUpdatedAt(LocalDateTime.now());
+                    return userRepository.save(existing);
+                })
                 .orElseGet(() -> {
                     newUser.setCreatedAt(LocalDateTime.now());
                     newUser.setUpdatedAt(LocalDateTime.now());

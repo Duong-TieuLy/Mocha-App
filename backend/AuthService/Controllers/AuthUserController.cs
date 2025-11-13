@@ -24,18 +24,27 @@ namespace AuthService.Services
             _firebaseAuthService = firebaseAuthService;
             _httpClientFactory = httpClientFactory;
         }
+<<<<<<< HEAD
         // ✅ Đăng ký user mới (qua Firebase)
+=======
+
+        // ✅ Đăng ký user mới và đồng bộ sang UserService
+>>>>>>> main
         [HttpPost("signup")]
         public async Task<IActionResult> SignUp([FromBody] SignUpRequest request)
         {
             try
             {
-                var firebaseUser = await _firebaseAuthService.CreateUserAsync(request.Email, request.Password, request.DisplayName);
+                // 1️⃣ Tạo user trên Firebase
+                var firebaseUser = await _firebaseAuthService.CreateUserAsync(
+                    request.Email, request.Password, request.DisplayName);
 
+                // 2️⃣ Kiểm tra user đã tồn tại trong Auth DB chưa
                 var existingUser = await _authUserRepository.GetByFirebaseUidAsync(firebaseUser.Uid);
                 if (existingUser != null)
                     return Conflict("User already exists.");
 
+                // 3️⃣ Thêm user vào Auth DB
                 var authUser = new AuthUser
                 {
                     FirebaseUid = firebaseUser.Uid,
@@ -46,6 +55,28 @@ namespace AuthService.Services
                 };
                 await _authUserRepository.AddAsync(authUser);
 
+                // 4️⃣ Đồng bộ user sang UserService
+                var http = _httpClientFactory.CreateClient();
+                var newUser = new
+                {
+                    firebaseUid = firebaseUser.Uid,
+                    email = firebaseUser.Email,           // ✅ bắt buộc
+                    fullName = firebaseUser.DisplayName   // ✅ tùy muốn
+                };
+
+                try
+                {
+                    var response = await http.PostAsJsonAsync("http://userservice:8082/api/users/sync", newUser);
+                    if (!response.IsSuccessStatusCode)
+                        Console.WriteLine($"⚠️ Failed to sync user to UserService: {response.StatusCode}");
+                    else
+                        Console.WriteLine($"✅ Synced user {firebaseUser.Uid} to UserService");
+                }
+                catch (HttpRequestException ex)
+                {
+                    Console.WriteLine($"🚫 Error calling UserService: {ex.Message}");
+                }
+
                 return Ok(new { uid = firebaseUser.Uid, email = firebaseUser.Email });
             }
             catch (Exception ex)
@@ -55,7 +86,7 @@ namespace AuthService.Services
             }
         }
 
-        // ✅ Xác thực token và đồng bộ user sang UserService
+        // ✅ Xác thực token gọn nhẹ
         [HttpPost("verifyToken")]
         public async Task<IActionResult> VerifyToken([FromBody] TokenRequest request)
         {
@@ -64,6 +95,7 @@ namespace AuthService.Services
                 // 1️⃣ Verify Firebase token
                 var uid = await _firebaseAuthService.VerifyIdTokenAsync(request.IdToken);
 
+<<<<<<< HEAD
                 // 2️⃣ Kiểm tra Auth DB
                 var user = await _authUserRepository.GetByFirebaseUidAsync(uid);
                 bool isNewUser = false;
@@ -85,6 +117,11 @@ namespace AuthService.Services
 
                     Console.WriteLine($"✅ Created new AuthUser for uid={uid}");
                 }
+=======
+                var user = await _authUserRepository.GetByFirebaseUidAsync(uid);
+                if (user == null)
+                    return NotFound("User not found in Auth DB.");
+>>>>>>> main
 
                 // 3️⃣ Luôn đồng bộ sang UserService
                 try

@@ -1,5 +1,6 @@
 package com.userservice.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -9,8 +10,11 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
+<<<<<<< HEAD
 import java.util.ArrayList;
 import java.util.List;
+=======
+>>>>>>> main
 
 @Entity
 @Table(name = "users")
@@ -23,6 +27,9 @@ public class User {
 
     @Column(nullable = false, unique = true)
     private String firebaseUid;
+
+    @Column(nullable = false, unique = true)
+    private String email; // ✅ thêm email
 
     private String fullName;
 
@@ -59,6 +66,7 @@ public class User {
     // 🔹 Ai đang theo dõi người này
     @ManyToMany(mappedBy = "following")
     private Set<User> followers = new HashSet<>();
+<<<<<<< HEAD
 
     // Quan hệ với Friendship - Lời mời đã gửi
     @OneToMany(mappedBy = "sender", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -69,4 +77,6 @@ public class User {
     @OneToMany(mappedBy = "receiver", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference("user-received-requests")
     private List<Friend> receivedFriendRequests = new ArrayList<>();
+=======
+>>>>>>> main
 }

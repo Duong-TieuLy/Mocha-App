@@ -2,154 +2,136 @@ package com.userservice.services;
 
 import com.userservice.dtos.FriendshipResponseDTO;
 import com.userservice.dtos.UserDTO;
-import com.userservice.enums.FriendshipStatus;
 import com.userservice.models.Friend;
 import com.userservice.models.User;
 import com.userservice.repositories.FriendRepository;
 import com.userservice.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.ArrayList;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class FriendService {
 
-    private final FriendRepository friendshipRepository;
+    private final FriendRepository friendRepository;
     private final UserRepository userRepository;
 
+    /**
+     * Tạo friendship tự động khi 2 người follow lẫn nhau
+     * Được gọi từ FollowService sau khi follow thành công
+     */
     @Transactional
-    public FriendshipResponseDTO sendFriendRequest(Long senderId, Long receiverId) {
-        // Kiểm tra không gửi lời mời cho chính mình
-        if (senderId.equals(receiverId)) {
-            throw new IllegalArgumentException("Không thể kết bạn với chính mình");
+    public void createFriendshipIfMutualFollow(Long userId1, Long userId2) {
+        log.info("==> Checking friendship creation: {} <-> {}", userId1, userId2);
+        
+        try {
+            // Kiểm tra xem đã là bạn bè chưa
+            if (friendRepository.existsByUserIds(userId1, userId2)) {
+                log.info("Friendship already exists between {} and {}", userId1, userId2);
+                return;
+            }
+
+            // ✅ FIX: Kiểm tra mutual follow bằng query trực tiếp thay vì lazy loading
+            boolean user1FollowsUser2 = userRepository.isFollowing(userId1, userId2);
+            boolean user2FollowsUser1 = userRepository.isFollowing(userId2, userId1);
+
+            log.info("Mutual follow check: {} -> {} = {}, {} -> {} = {}", 
+                    userId1, userId2, user1FollowsUser2,
+                    userId2, userId1, user2FollowsUser1);
+
+            if (user1FollowsUser2 && user2FollowsUser1) {
+                // Tạo friendship (luôn đặt ID nhỏ hơn trước)
+                Friend friendship = new Friend();
+                Long smallerId = Math.min(userId1, userId2);
+                Long largerId = Math.max(userId1, userId2);
+
+                User user1 = userRepository.findById(smallerId)
+                        .orElseThrow(() -> new RuntimeException("User not found: " + smallerId));
+                User user2 = userRepository.findById(largerId)
+                        .orElseThrow(() -> new RuntimeException("User not found: " + largerId));
+
+                friendship.setUser1(user1);
+                friendship.setUser2(user2);
+
+                friendRepository.save(friendship);
+                log.info("✅ Created friendship between {} and {}", smallerId, largerId);
+            } else {
+                log.info("Not mutual follow yet between {} and {}", userId1, userId2);
+            }
+        } catch (Exception e) {
+            log.error("❌ Error in createFriendshipIfMutualFollow: {}", e.getMessage(), e);
+            throw e;
         }
-
-        // Lấy thông tin user
-        User sender = userRepository.findById(senderId)
-                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người gửi"));
-        User receiver = userRepository.findById(receiverId)
-                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người nhận"));
-
-        // Kiểm tra đã có quan hệ nào giữa 2 user chưa
-        if (friendshipRepository.existsBetweenUsers(senderId, receiverId)) {
-            throw new IllegalArgumentException("Đã có lời mời kết bạn giữa 2 người này");
-        }
-
-        // Tạo friendship mới
-        Friend friendship = new Friend();
-        friendship.setSender(sender);
-        friendship.setReceiver(receiver);
-        friendship.setStatus(FriendshipStatus.PENDING);
-
-        friendship = friendshipRepository.save(friendship);
-
-        return mapToResponseDTO(friendship);
     }
 
+    /**
+     * Xóa friendship khi unfollow
+     * Được gọi từ FollowService sau khi unfollow thành công
+     */
     @Transactional
-    public FriendshipResponseDTO acceptFriendRequest(Long userId, Long requestId) {
-        Friend friendship = friendshipRepository.findById(requestId)
-                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy lời mời kết bạn"));
-
-        // Kiểm tra quyền chấp nhận
-        if (!friendship.getReceiver().getId().equals(userId)) {
-            throw new IllegalArgumentException("Bạn không có quyền chấp nhận lời mời này");
+    public void deleteFriendshipIfExists(Long userId1, Long userId2) {
+        if (friendRepository.existsByUserIds(userId1, userId2)) {
+            friendRepository.deleteByUserIds(userId1, userId2);
+            log.info("Deleted friendship between {} and {}", userId1, userId2);
         }
-
-        if (friendship.getStatus() != FriendshipStatus.PENDING) {
-            throw new IllegalArgumentException("Lời mời đã được xử lý");
-        }
-
-        friendship.setStatus(FriendshipStatus.ACCEPTED);
-        friendship = friendshipRepository.save(friendship);
-
-        return mapToResponseDTO(friendship);
     }
 
-    @Transactional
-    public FriendshipResponseDTO rejectFriendRequest(Long userId, Long requestId) {
-        Friend friendship = friendshipRepository.findById(requestId)
-                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy lời mời kết bạn"));
-
-        // Kiểm tra quyền từ chối
-        if (!friendship.getReceiver().getId().equals(userId)) {
-            throw new IllegalArgumentException("Bạn không có quyền từ chối lời mời này");
-        }
-
-        if (friendship.getStatus() != FriendshipStatus.PENDING) {
-            throw new IllegalArgumentException("Lời mời đã được xử lý");
-        }
-
-        friendship.setStatus(FriendshipStatus.REJECTED);
-        friendship = friendshipRepository.save(friendship);
-
-        return mapToResponseDTO(friendship);
+    /**
+     * Kiểm tra 2 user có phải bạn bè không
+     */
+    public boolean areFriends(Long userId1, Long userId2) {
+        return friendRepository.existsByUserIds(userId1, userId2);
     }
 
+    /**
+     * Lấy danh sách bạn bè của user
+     */
     @Transactional(readOnly = true)
-    public List<FriendshipResponseDTO> getPendingRequests(Long userId) {
-        List<Friend> friendships = friendshipRepository.findPendingRequestsByReceiverId(userId);
-        return friendships.stream()
-                .map(this::mapToResponseDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    public List<UserDTO> getFriends(Long userId) {
-        List<Friend> friendships = friendshipRepository.findFriendsByUserId(userId);
+    public List<FriendshipResponseDTO> getFriends(Long userId) {
+        List<Friend> friendships = friendRepository.findAllByUserId(userId);
 
         return friendships.stream()
                 .map(friendship -> {
-                    User friend = friendship.getSender().getId().equals(userId)
-                            ? friendship.getReceiver()
-                            : friendship.getSender();
-                    return mapToUserDTO(friend);
+                    User otherUser = friendship.getOtherUser(userId);
+                    return new FriendshipResponseDTO(
+                            friendship.getId(),
+                            convertToUserDTO(friendship.getUser1()),
+                            convertToUserDTO(friendship.getUser2()),
+                            friendship.getCreatedAt(),
+                            null  // Không còn updatedAt
+                    );
                 })
                 .collect(Collectors.toList());
     }
 
-    @Transactional(readOnly = true)
-    public boolean areFriends(Long userId1, Long userId2) {
-        return friendshipRepository.areFriends(userId1, userId2);
+    /**
+     * Lấy danh sách ID của tất cả bạn bè (dùng cho queries khác)
+     */
+    public List<Long> getFriendIds(Long userId) {
+        return friendRepository.findAllFriendIdsByUserId(userId);
     }
 
-    @Transactional
-    public void unfriend(Long userId, Long friendId) {
-        // Sửa lại để dùng @Query thay vì findBySenderIdAndReceiverId
-        var friendship = friendshipRepository.findBySenderIdAndReceiverId(userId, friendId)
-                .or(() -> friendshipRepository.findBySenderIdAndReceiverId(friendId, userId));
-
-        friendship.ifPresent(friendshipRepository::delete);
+    /**
+     * Đếm số lượng bạn bè
+     */
+    public long countFriends(Long userId) {
+        return friendRepository.countByUserId(userId);
     }
 
-    private FriendshipResponseDTO mapToResponseDTO(Friend friendship) {
-        FriendshipResponseDTO dto = new FriendshipResponseDTO();
-        dto.setId(friendship.getId());
-        dto.setSender(mapToUserDTO(friendship.getSender()));
-        dto.setReceiver(mapToUserDTO(friendship.getReceiver()));
-        dto.setStatus(friendship.getStatus());
-        dto.setCreatedAt(friendship.getCreatedAt());
-        dto.setUpdatedAt(friendship.getUpdatedAt());
-        return dto;
-    }
+    private UserDTO convertToUserDTO(User user) {
+        if (user == null) return null;
 
-    private UserDTO mapToUserDTO(User user) {
         UserDTO dto = new UserDTO();
         dto.setId(user.getId());
         dto.setFullName(user.getFullName());
-        dto.setPhotoUrl(user.getPhotoUrl());
         dto.setBio(user.getBio());
-
-        // Include online status if available
-        if (user.getStatus() != null) {
-            dto.setOnline(user.getStatus().isOnline());
-            dto.setLastSeen(user.getStatus().getLastSeen());
-        }
-
+        dto.setPhotoUrl(user.getPhotoUrl());
         return dto;
     }
 }

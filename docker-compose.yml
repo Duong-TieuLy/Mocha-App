@@ -37,9 +37,11 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=server=db;port=3306;database=AuthDB;user=root;password=YourStrong@Password123;
     depends_on:
-      - db
+      db:
+        condition: service_healthy  # ← Đợi MySQL healthy
     networks:
       - mocha-network
+    restart: on-failure
 
   # ==========================
   # User Service (Spring Boot)
@@ -60,9 +62,11 @@ services:
       - SERVER_PORT=8082
       - SPRING_APPLICATION_NAME=UserService
     depends_on:
-      - db
+      db:
+        condition: service_healthy  # ← Đợi MySQL healthy
     networks:
       - mocha-network
+<<<<<<< HEAD
  # ==========================
   # Post Service (Spring Boot)
   # ==========================
@@ -85,6 +89,9 @@ services:
       - db
     networks:
       - mocha-network
+=======
+    restart: on-failure  # ← Tự động restart nếu fail
+>>>>>>> main
 
   # ==========================
   # API Gateway (Ocelot)
@@ -102,6 +109,33 @@ services:
     networks:
       - mocha-network
 
+<<<<<<< HEAD
+=======
+  # ==========================
+  # MySQL Database
+  # ==========================
+  db:
+    image: mysql:8.0
+    container_name: mocha-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: YourStrong@Password123
+      MYSQL_DATABASE: AuthDB
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - mocha-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pYourStrong@Password123"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s  # ← Cho MySQL 30s khởi động
+
+>>>>>>> main
 # ==========================
 # Networks & Volumes
 # ==========================

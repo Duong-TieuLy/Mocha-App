@@ -1,8 +1,7 @@
+
 package com.userservice.models;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.userservice.enums.FriendshipStatus;
-import com.userservice.models.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -11,11 +10,12 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "friendships", 
-       uniqueConstraints = @UniqueConstraint(columnNames = {"sender_id", "receiver_id"}),
+       uniqueConstraints = {
+           @UniqueConstraint(columnNames = {"user_id_1", "user_id_2"})
+       },
        indexes = {
-           @Index(name = "idx_sender", columnList = "sender_id"),
-           @Index(name = "idx_receiver", columnList = "receiver_id"),
-           @Index(name = "idx_status", columnList = "status")
+           @Index(name = "idx_user1", columnList = "user_id_1"),
+           @Index(name = "idx_user2", columnList = "user_id_2")
        })
 @Data
 @NoArgsConstructor
@@ -26,43 +26,43 @@ public class Friend {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Relationship với User entity
+    /**
+     * Luôn lưu user có ID nhỏ hơn vào user1
+     * để tránh duplicate (A-B và B-A)
+     */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "sender_id", nullable = false, foreignKey = @ForeignKey(name = "fk_friendship_sender"))
-    @JsonBackReference("user-sent-requests")
-    private User sender;
+    @JoinColumn(name = "user_id_1", nullable = false, 
+                foreignKey = @ForeignKey(name = "fk_friendship_user1"))
+    @JsonBackReference
+    private User user1;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "receiver_id", nullable = false, foreignKey = @ForeignKey(name = "fk_friendship_receiver"))
-    @JsonBackReference("user-received-requests")
-    private User receiver;
+    @JoinColumn(name = "user_id_2", nullable = false,
+                foreignKey = @ForeignKey(name = "fk_friendship_user2"))
+    @JsonBackReference
+    private User user2;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private FriendshipStatus status;
-
-    @Column(nullable = false)
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
-    private LocalDateTime updatedAt;
 
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
     }
 
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
-    
     // Helper methods
-    public Long getSenderId() {
-        return sender != null ? sender.getId() : null;
+    public boolean involves(Long userId) {
+        return (user1 != null && user1.getId().equals(userId)) ||
+               (user2 != null && user2.getId().equals(userId));
     }
-    
-    public Long getReceiverId() {
-        return receiver != null ? receiver.getId() : null;
+
+    public User getOtherUser(Long userId) {
+        if (user1 != null && user1.getId().equals(userId)) {
+            return user2;
+        }
+        if (user2 != null && user2.getId().equals(userId)) {
+            return user1;
+        }
+        return null;
     }
 }

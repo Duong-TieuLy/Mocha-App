@@ -1,6 +1,5 @@
 package com.userservice.dtos;
 
-import com.userservice.enums.FriendshipStatus;
 import com.userservice.dtos.UserDTO;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -14,7 +13,6 @@ public class FriendshipResponseDTO {
     private Long id;
     private UserDTO sender;
     private UserDTO receiver;
-    private FriendshipStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
