@@ -30,6 +30,9 @@ public class User {
 
     private String fullName;
 
+    @Column(unique = true)
+    private String username;
+
     @Column(length = 500)
     private String bio;
 
@@ -65,12 +68,12 @@ public class User {
     private Set<User> followers = new HashSet<>();
 
     // Quan hệ với Friendship - Lời mời đã gửi
-    @OneToMany(mappedBy = "sender", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "user1", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference("user-sent-requests")
     private List<Friend> sentFriendRequests = new ArrayList<>();
 
     // Quan hệ với Friendship - Lời mời đã nhận
-    @OneToMany(mappedBy = "receiver", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "user2", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference("user-received-requests")
     private List<Friend> receivedFriendRequests = new ArrayList<>();
 }

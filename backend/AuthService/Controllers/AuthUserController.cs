@@ -120,6 +120,8 @@ namespace AuthService.Services
                     var syncData = new
                     {
                         firebaseUid = user.FirebaseUid,
+                        email = user.Email,
+                        fullName = user.DisplayName
                     };
 
                     var response = await http.PostAsJsonAsync("http://userservice:8082/api/users/sync", syncData);

@@ -1,6 +1,7 @@
 package com.userservice.controllers;
 
 import com.userservice.dtos.UserProfileDto;
+import com.userservice.dtos.UserSyncDto;
 import com.userservice.mapper.UserMapper;
 import com.userservice.models.User;
 import com.userservice.services.UserService;
@@ -77,16 +78,23 @@ public class UserController {
      * 🔹 Đồng bộ user từ AuthService
      */
     @PostMapping("/sync")
-    public ResponseEntity<User> syncUser(@RequestBody User newUser) {
-        log.info("🔄 POST /api/users/sync — data={}", newUser);
+    public ResponseEntity<User> syncUser(@RequestBody UserSyncDto dto) {
+        log.info("🔄 POST /api/users/sync — data={}", dto);
 
-        if (newUser.getFirebaseUid() == null || newUser.getFirebaseUid().isEmpty()) {
+        if (dto.getFirebaseUid() == null || dto.getFirebaseUid().isEmpty()) {
             log.error("❌ Missing firebaseUid in sync request");
             return ResponseEntity.badRequest().build();
         }
+        User user = new User();
+        user.setFirebaseUid(dto.getFirebaseUid());
+        user.setEmail(dto.getEmail());
+        user.setFullName(dto.getFullName());
+        user.setUsername(dto.getUsername());
+        user.setBio(dto.getBio());
+        user.setInterests(dto.getInterests());
+        user.setPhotoUrl(dto.getPhotoUrl());
 
-        User saved = service.syncUser(newUser);
-        log.info("✅ Synced user with firebaseUid={}", saved.getFirebaseUid());
+        User saved = service.syncUser(user);
         return ResponseEntity.ok(saved);
     }
 }
