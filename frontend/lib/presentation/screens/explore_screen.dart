@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'dart:io';  // Vẫn cần nếu dùng File ở đâu đó
-import 'post_dialog.dart';  // Import file mới
+import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'post_dialog.dart';
 
 class ExplorePage extends StatefulWidget {
   const ExplorePage({super.key});
@@ -10,8 +11,8 @@ class ExplorePage extends StatefulWidget {
 }
 
 class _ExplorePageState extends State<ExplorePage> {
-  // Danh sách posts với dữ liệu ảo ban đầu (dùng Map thay vì class Post)
-  List<Map<String, dynamic>> _posts = [
+  // Giả lập dữ liệu server
+  List<Map<String, dynamic>> _allPosts = [
     {
       'name': "Dipprokash Sardar",
       'username': "@Kolkata",
@@ -28,50 +29,99 @@ class _ExplorePageState extends State<ExplorePage> {
       'likes': 6500,
       'comments': 320,
     },
+    // Bạn có thể thêm nhiều post khác
   ];
 
-  // ScrollController để theo dõi vị trí cuộn
+  List<Map<String, dynamic>> _posts = []; // Danh sách posts đang hiển thị
   final ScrollController _scrollController = ScrollController();
-
-  // Biến để kiểm soát opacity của FAB (1.0 = hiện, 0.0 = ẩn)
   double _fabOpacity = 1.0;
+  bool _isRefreshing = false;
+  bool _isLoadingMore = false;
+
+  final int _pageSize = 2; // số bài load mỗi lần
+  int _currentPage = 0;
+
+  final List<String> names = ["You", "Bella", "Emma", "Aron", "Milan"];
+  final List<String> images = [
+    "https://cdn3d.iconscout.com/3d/premium/thumb/young-man-5689575-4758544.png",
+    "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d",
+    "https://images.unsplash.com/photo-1501004318641-b39e6451bec6",
+    "https://images.unsplash.com/photo-1560807707-8cc77767d783",
+    "https://images.unsplash.com/photo-1527980965255-d3b416303d12",
+  ];
 
   @override
   void initState() {
     super.initState();
-    // Lắng nghe sự kiện cuộn
+    _loadMorePosts(); // load trang đầu tiên
+
     _scrollController.addListener(() {
+      // Ẩn/hiện FAB
       setState(() {
-        // Nếu cuộn xuống (offset > 0), ẩn FAB; ngược lại hiện
         _fabOpacity = _scrollController.offset > 0 ? 0.0 : 1.0;
       });
+
+      // Pull-to-refresh
+      if (_scrollController.offset <= 0 && !_isRefreshing) {
+        _refreshPage();
+      }
+
+      // Infinite scroll khi scroll gần cuối
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 200 &&
+          !_isLoadingMore) {
+        _loadMorePosts();
+      }
+    });
+  }
+
+  // Load thêm post theo trang
+  void _loadMorePosts() async {
+    if (_currentPage * _pageSize >= _allPosts.length) return;
+    _isLoadingMore = true;
+
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    int start = _currentPage * _pageSize;
+    int end = start + _pageSize;
+    if (end > _allPosts.length) end = _allPosts.length;
+
+    setState(() {
+      _posts.addAll(_allPosts.sublist(start, end));
+      _currentPage++;
+    });
+
+    _isLoadingMore = false;
+  }
+
+  // Pull-to-refresh
+  Future<void> _refreshPage() async {
+    _isRefreshing = true;
+    await Future.delayed(const Duration(milliseconds: 500));
+    setState(() {
+      _posts.clear();
+      _currentPage = 0;
+    });
+    _loadMorePosts();
+    _isRefreshing = false;
+  }
+
+  // Thêm post mới từ dialog
+  void _addNewPost(Map<String, dynamic> newPost) {
+    setState(() {
+      _posts.insert(0, newPost);
+      _allPosts.insert(0, newPost);
     });
   }
 
   @override
   void dispose() {
-    _scrollController.dispose();  // Giải phóng controller khi không dùng
+    _scrollController.dispose();
     super.dispose();
-  }
-
-  // Hàm để thêm post mới (được gọi từ PostDialog)
-  void _addNewPost(Map<String, dynamic> newPost) {
-    setState(() {
-      _posts.insert(0, newPost);  // Thêm vào đầu danh sách
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final names = ["You", "Bella", "Emma", "Aron", "Milan"];
-    final images = [
-      "https://cdn3d.iconscout.com/3d/premium/thumb/young-man-5689575-4758544.png",
-      "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d",
-      "https://images.unsplash.com/photo-1501004318641-b39e6451bec6",
-      "https://images.unsplash.com/photo-1560807707-8cc77767d783",
-      "https://images.unsplash.com/photo-1527980965255-d3b416303d12",
-    ];
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -94,7 +144,6 @@ class _ExplorePageState extends State<ExplorePage> {
             child: IconButton(
               icon: const Icon(Icons.camera_alt_outlined, color: Colors.black),
               onPressed: () {
-                // Mở dialog bằng widget riêng
                 showDialog(
                   context: context,
                   builder: (context) => PostDialog(onPostCreated: _addNewPost),
@@ -116,80 +165,84 @@ class _ExplorePageState extends State<ExplorePage> {
           ),
         ],
       ),
-      body: ListView(
-        controller: _scrollController,  // Gán ScrollController vào ListView
-        children: [
-          // Stories Section (giữ nguyên)
-          SizedBox(
-            height: 105,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.only(left: 12, right: 8),
-              itemCount: names.length,
-              itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(2.5),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [Colors.blue, Colors.lightBlueAccent],
+      body: ListView.builder(
+        controller: _scrollController,
+        itemCount: _posts.length + 2, // +1 cho Stories, +1 cho loading
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            // Stories Section
+            return SizedBox(
+              height: 105,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                itemCount: names.length,
+                itemBuilder: (context, i) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(2.5),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              colors: [Colors.blue, Colors.lightBlueAccent],
+                            ),
+                          ),
+                          child: CircleAvatar(
+                            radius: 28,
+                            backgroundImage: NetworkImage(images[i]),
                           ),
                         ),
-                        child: CircleAvatar(
-                          radius: 28,
-                          backgroundImage: NetworkImage(images[index]),
+                        const SizedBox(height: 6),
+                        Text(
+                          names[i],
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        names[index],
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            );
+          }
 
-          const SizedBox(height: 10),
+          if (index <= _posts.length) {
+            // Post Card
+            final post = _posts[index - 1];
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: _buildPostCard(
+                key: ValueKey(post['image']),
+                name: post['name'],
+                username: post['username'],
+                image: post['image'],
+                caption: post['caption'],
+                likes: post['likes'],
+                comments: post['comments'],
+              ),
+            );
+          }
 
-          // Posts Section (dùng ListView.builder cho danh sách động)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: ListView.builder(
-              shrinkWrap: true, // Để ListView con không chiếm toàn bộ chiều cao
-              physics: const NeverScrollableScrollPhysics(), // Vô hiệu hóa cuộn riêng
-              itemCount: _posts.length,
-              itemBuilder: (context, index) {
-                final post = _posts[index];
-                return _buildPostCard(
-                  name: post['name'],
-                  username: post['username'],
-                  image: post['image'],
-                  caption: post['caption'],
-                  likes: post['likes'],
-                  comments: post['comments'],
-                );
-              },
-            ),
-          ),
-        ],
+          // Loading indicator cuối ListView
+          return _isLoadingMore
+              ? const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(child: CircularProgressIndicator()),
+          )
+              : const SizedBox.shrink();
+        },
       ),
       floatingActionButton: AnimatedOpacity(
-        opacity: _fabOpacity,  // Điều khiển độ mờ dựa trên scroll
-        duration: const Duration(milliseconds: 300),  // Thời gian fade
+        opacity: _fabOpacity,
+        duration: const Duration(milliseconds: 300),
         child: FloatingActionButton(
           onPressed: () {
-            // Mở dialog bằng widget riêng
             showDialog(
               context: context,
               builder: (context) => PostDialog(onPostCreated: _addNewPost),
@@ -202,17 +255,18 @@ class _ExplorePageState extends State<ExplorePage> {
     );
   }
 
-  // Custom PostCard (thêm tham số caption)
   Widget _buildPostCard({
+    required Key key,
     required String name,
     required String username,
     required String image,
-    required String caption, // Thêm caption động
+    required String caption,
     required int likes,
     required int comments,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      key: key,
+      margin: const EdgeInsets.only(bottom: 12, top: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFFD8E8FF),
@@ -256,23 +310,25 @@ class _ExplorePageState extends State<ExplorePage> {
             ],
           ),
           const SizedBox(height: 10),
-
-          // Caption (động từ dữ liệu)
+          // Caption
           Text(
             caption,
             style: const TextStyle(fontSize: 14, color: Colors.black),
           ),
           const SizedBox(height: 10),
-
-          // Image (hỗ trợ cả local file và network)
+          // Image
           ClipRRect(
             borderRadius: BorderRadius.circular(15),
             child: image.startsWith('http')
-                ? Image.network(
-              image,
+                ? CachedNetworkImage(
+              imageUrl: image,
               height: 200,
               width: double.infinity,
               fit: BoxFit.cover,
+              placeholder: (context, url) =>
+              const Center(child: CircularProgressIndicator()),
+              errorWidget: (context, url, error) =>
+              const Center(child: Icon(Icons.error, color: Colors.red)),
             )
                 : Image.file(
               File(image),
@@ -282,22 +338,25 @@ class _ExplorePageState extends State<ExplorePage> {
             ),
           ),
           const SizedBox(height: 12),
-
-          // Like / Comment / Share Row
+          // Like / Comment / Share
           Row(
             children: [
               const Icon(Icons.favorite, color: Colors.red, size: 22),
               const SizedBox(width: 6),
               Text(
-                likes >= 1000 ? "${(likes / 1000).toStringAsFixed(1)}K" : likes.toString(),
-                style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
+                likes >= 1000
+                    ? "${(likes / 1000).toStringAsFixed(1)}K"
+                    : likes.toString(),
+                style:
+                const TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
               ),
               const SizedBox(width: 18),
               const Icon(Icons.chat_bubble_outline, color: Colors.black, size: 22),
               const SizedBox(width: 6),
               Text(
                 comments.toString(),
-                style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
+                style:
+                const TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
               ),
               const Spacer(),
               const Icon(Icons.send_outlined, color: Colors.black),
