@@ -1,5 +1,6 @@
 package com.userservice.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -21,6 +22,9 @@ public class User {
 
     @Column(nullable = false, unique = true)
     private String firebaseUid;
+
+    @Column(nullable = false, unique = true)
+    private String email; // ✅ thêm email
 
     private String fullName;
 

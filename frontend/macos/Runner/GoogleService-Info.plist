@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyBLYplU3aWfpSHzVnjN_y_PXe9NYU2squ8</string>
+	<key>GCM_SENDER_ID</key>
+	<string>947532662145</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>uth.edu.frontend</string>
+	<key>PROJECT_ID</key>
+	<string>mocha-app-bad3f</string>
+	<key>STORAGE_BUCKET</key>
+	<string>mocha-app-bad3f.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:947532662145:ios:c6a75624f62e4960fa1480</string>
+</dict>
+</plist>
