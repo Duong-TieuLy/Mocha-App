@@ -57,10 +57,22 @@ class MyApp extends StatelessWidget {
         '/complete-profile': (context) => const CompleteProfileScreen(),
         '/upload-photo': (context) => const UploadPhotoScreen(),
         '/home': (context) => const MainPage(),
-        '/chat': (context) => const ChatListScreen(),
         '/moment': (context) => const MomentsPage(),
         '/profile': (context) => const ProfilePage(),
         '/explore': (context) => const ExplorePage(),
+      },
+
+      // 🟡 Xử lý route động cho chat (để pass userId)
+      onGenerateRoute: (settings) {
+        if (settings.name == '/chat') {
+          final args = settings.arguments as Map<String, dynamic>?;
+          return MaterialPageRoute(
+            builder: (context) => ChatListScreen(
+              currentUserId: args?['currentUserId'],
+            ),
+          );
+        }
+        return null;
       },
     );
   }
@@ -68,7 +80,12 @@ class MyApp extends StatelessWidget {
 
 // 🟡 Thanh điều hướng chính
 class MainPage extends StatefulWidget {
-  const MainPage({super.key});
+  final String? currentUserId; // ⭐ Thêm currentUserId
+
+  const MainPage({
+    super.key,
+    this.currentUserId,
+  });
 
   @override
   State<MainPage> createState() => _MainPageState();
@@ -77,17 +94,18 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> {
   int _currentIndex = 0;
 
-  final List<Widget> _pages = const [
-    MomentsPage(),
-    ChatListScreen(),
-    ExplorePage(),
-    ProfilePage(),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    // ⭐ Truyền currentUserId vào ChatListScreen
+    final List<Widget> pages = [
+      const MomentsPage(),
+      ChatListScreen(currentUserId: widget.currentUserId),
+      const ExplorePage(),
+      const ProfilePage(),
+    ];
+
     return Scaffold(
-      body: _pages[_currentIndex],
+      body: pages[_currentIndex],
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 8,
