@@ -99,7 +99,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddJsonFile("ocelot.json", optional: false, reloadOnChange: true);
 
 // 🔐 Firebase Project ID
-var firebaseProjectId = "sdcrms-49dfb";
+var firebaseProjectId = "mocha-app-bad3f";
 
 // Cấu hình Authentication cho Ocelot
 builder.Services.AddAuthentication()
