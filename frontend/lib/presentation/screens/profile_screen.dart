@@ -2,18 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:frontend/presentation/screens/post_card.dart';
 import 'package:frontend/presentation/screens/scrollable_tab.dart';
 
+import '../../data/models/user_profile.dart';
+
 class ProfilePage extends StatefulWidget {
-  // final String name;
-  // final String backgroundImage;
-  // final int followers;
-  // final int following;
-  // final String title;
+
   const ProfilePage({
-    // required this.name,
-    // required this.backgroundImage,
-    // required this.followers,
-    // required this.following,
-    // required this.title,
     super.key
   });
 
@@ -24,32 +17,9 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final List<PostCard> myAllPosts = const [
-    PostCard(
-      name: "Vĩ Ân Trần",
-      username: "@vian",
-      image: "https://picsum.photos/400",
-      comments: 5,
-      likes: 12,
-    ),
-    PostCard(
-      name: "Hana",
-      username: "@hana",
-      image: "https://picsum.photos/401",
-      comments: 3,
-      likes: 8,
-    ),
-  ];
+  final List<PostCard> myAllPosts = const [];
 
-  final List<PostCard> myPhotoPosts = const [
-    PostCard(
-      name: "Hana",
-      username: "@hana",
-      image: "https://picsum.photos/402",
-      comments: 2,
-      likes: 6,
-    ),
-  ];
+  final List<PostCard> myPhotoPosts = const [];
 
   final List<PostCard> myVideoPosts = const []; // chưa có video
 

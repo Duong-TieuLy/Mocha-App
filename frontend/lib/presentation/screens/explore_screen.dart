@@ -75,21 +75,6 @@ class ExplorePage extends StatelessWidget {
              },
             ),
             ),
-            // 🔹 Example Post Card
-            PostCard(name: "Damian", username: "@Damian12",
-                image: "https://images.unsplash.com/photo-1501785888041-af3ef285b470", likes: 10, comments: 252),
-
-            PostCard(name: "Katherine", username: "@Kiyyu23",
-                image:"https://images.unsplash.com/photo-1507525428034-b723cf961d3e", likes: 10,  comments: 250),
-            PostCard(name: "Damian", username: "@Damian12",
-                image: "https://images.unsplash.com/photo-1501785888041-af3ef285b470", likes: 10, comments: 252),
-            PostCard(name: "Damian", username: "@Damian12",
-                image: "https://images.unsplash.com/photo-1501785888041-af3ef285b470", likes: 10, comments: 252),
-
-            PostCard(name: "Katherine", username: "@Kiyyu23",
-                image:"https://images.unsplash.com/photo-1507525428034-b723cf961d3e", likes: 10,  comments: 250),
-            PostCard(name: "Damian", username: "@Damian12",
-                image: "https://images.unsplash.com/photo-1501785888041-af3ef285b470", likes: 10, comments: 252),
           ],
         ),
       )

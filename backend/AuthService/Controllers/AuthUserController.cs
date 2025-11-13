@@ -24,12 +24,8 @@ namespace AuthService.Services
             _firebaseAuthService = firebaseAuthService;
             _httpClientFactory = httpClientFactory;
         }
-<<<<<<< HEAD
-        // ✅ Đăng ký user mới (qua Firebase)
-=======
 
         // ✅ Đăng ký user mới và đồng bộ sang UserService
->>>>>>> main
         [HttpPost("signup")]
         public async Task<IActionResult> SignUp([FromBody] SignUpRequest request)
         {
@@ -95,7 +91,6 @@ namespace AuthService.Services
                 // 1️⃣ Verify Firebase token
                 var uid = await _firebaseAuthService.VerifyIdTokenAsync(request.IdToken);
 
-<<<<<<< HEAD
                 // 2️⃣ Kiểm tra Auth DB
                 var user = await _authUserRepository.GetByFirebaseUidAsync(uid);
                 bool isNewUser = false;
@@ -117,11 +112,6 @@ namespace AuthService.Services
 
                     Console.WriteLine($"✅ Created new AuthUser for uid={uid}");
                 }
-=======
-                var user = await _authUserRepository.GetByFirebaseUidAsync(uid);
-                if (user == null)
-                    return NotFound("User not found in Auth DB.");
->>>>>>> main
 
                 // 3️⃣ Luôn đồng bộ sang UserService
                 try

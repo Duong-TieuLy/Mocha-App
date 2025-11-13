@@ -2,28 +2,6 @@ version: "3.8"
 
 services:
   # ==========================
-  # MySQL Database
-  # ==========================
-  db:
-    image: mysql:8.0
-    container_name: mocha-mysql
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: YourStrong@Password123
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql-data:/var/lib/mysql
-      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - mocha-network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pYourStrong@Password123"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
-  # ==========================
   # Auth Service (.NET)
   # ==========================
   authservice:
@@ -66,8 +44,8 @@ services:
         condition: service_healthy  # ← Đợi MySQL healthy
     networks:
       - mocha-network
-<<<<<<< HEAD
- # ==========================
+    restart: on-failure  # ← Tự động restart nếu fail
+  # ==========================
   # Post Service (Spring Boot)
   # ==========================
   postservice:
@@ -89,9 +67,7 @@ services:
       - db
     networks:
       - mocha-network
-=======
     restart: on-failure  # ← Tự động restart nếu fail
->>>>>>> main
 
   # ==========================
   # API Gateway (Ocelot)
@@ -106,11 +82,10 @@ services:
     depends_on:
       - authservice
       - userservice
+      - postservice
     networks:
       - mocha-network
 
-<<<<<<< HEAD
-=======
   # ==========================
   # MySQL Database
   # ==========================
@@ -135,7 +110,6 @@ services:
       retries: 10
       start_period: 30s  # ← Cho MySQL 30s khởi động
 
->>>>>>> main
 # ==========================
 # Networks & Volumes
 # ==========================

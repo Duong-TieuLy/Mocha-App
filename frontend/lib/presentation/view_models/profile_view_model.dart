@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../../data/models/post_model.dart';
 import '../../data/services/post_service.dart';
 
@@ -10,40 +9,53 @@ class PostViewModel extends ChangeNotifier {
   bool isLoading = false;
   String? errorMessage;
 
-  Future<void> fetchPosts() async {
-    isLoading = true;
-    notifyListeners();
-
+  /// 🔹 Lấy danh sách bài viết
+  Future<void> fetchPosts([String? token]) async {
+    _setLoading(true);
     try {
-      posts = await _service.getAllPosts();
+      posts = await _service.getAllPosts(token);
       errorMessage = null;
     } catch (e) {
-      errorMessage = e.toString();
+      errorMessage = 'Failed to load posts: $e';
     } finally {
-      isLoading = false;
-      notifyListeners();
+      _setLoading(false);
     }
   }
 
-  Future<void> createPost(Post post) async {
+  /// 🔹 Tạo bài viết mới
+  Future<void> createPost(Post post, [String? token]) async {
+    _setLoading(true);
     try {
-      final newPost = await _service.createPost(post);
+      final newPost = await _service.createPost(post, token);
       posts.insert(0, newPost);
-      notifyListeners();
+      errorMessage = null;
     } catch (e) {
-      errorMessage = e.toString();
-      notifyListeners();
+      errorMessage = 'Failed to create post: $e';
+    } finally {
+      _setLoading(false);
     }
   }
 
-  Future<void> deletePost(int id) async {
+  /// 🔹 Xoá bài viết theo ID
+  Future<void> deletePost(int id, [String? token]) async {
+    _setLoading(true);
     try {
-      await _service.deletePost(id);
+      await _service.deletePost(id, token);
       posts.removeWhere((p) => p.id == id);
-      notifyListeners();
+      errorMessage = null;
     } catch (e) {
-      errorMessage = e.toString();
-      notifyListeners();
+      errorMessage = 'Failed to delete post: $e';
+    } finally {
+      _setLoading(false);
     }
+  }
+
+  /// 🔹 Làm mới danh sách
+  Future<void> refresh([String? token]) async => fetchPosts(token);
+
+  /// 🔹 Helper cập nhật trạng thái loading
+  void _setLoading(bool value) {
+    isLoading = value;
+    notifyListeners();
   }
 }

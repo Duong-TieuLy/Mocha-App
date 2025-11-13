@@ -17,12 +17,12 @@ class Post {
 
   factory Post.fromJson(Map<String, dynamic> json) {
     return Post(
-      id: json['id'],
-      firebaseUid: json['firebaseUid'],
-      content: json['content'],
+      id: json['id'] ?? 0,
+      firebaseUid: json['firebaseUid'] ?? '',
+      content: json['content'] ?? '',
       images: json['images'],
       likeCount: json['likeCount'] ?? 0,
-      createdAt: DateTime.parse(json['createdAt']),
+      createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
     );
   }
 

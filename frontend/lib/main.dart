@@ -1,22 +1,21 @@
 import 'package:flutter/material.dart';
-
-// 🟢 Import 3 màn mới
-import 'presentation/screens/splash_screen.dart';
-import 'presentation/screens/login_screen.dart';
-import 'presentation/screens/signup_screen.dart';
-
-import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
+// 🟢 Import các view model
+import 'presentation/view_models/auth_view_model.dart';
 
-// 🟣 Import các màn khác
+// 🟢 Import các màn
+import 'presentation/screens/splash_screen.dart';
+import 'presentation/screens/login_screen.dart';
+import 'presentation/screens/signup_screen.dart';
 import 'presentation/screens/congratulations_screen.dart';
 import 'presentation/screens/complete_profile_screen.dart';
 import 'presentation/screens/upload_photo_screen.dart';
-import 'package:frontend/presentation/screens/explore_screen.dart';
-import 'package:frontend/presentation/screens/moments_screen.dart';
-import 'package:frontend/presentation/screens/profile_screen.dart';
+import 'presentation/screens/explore_screen.dart';
+import 'presentation/screens/moments_screen.dart';
+import 'presentation/screens/profile_screen.dart';
 import 'chat/chat_list_screen.dart';
 
 void main() async {
@@ -32,36 +31,35 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Mocha App',
-      theme: ThemeData(
-        useMaterial3: true,
-        fontFamily: 'Poppins',
-        scaffoldBackgroundColor: Colors.white,
-        colorSchemeSeed: Colors.blue,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthViewModel()),
+        // Add các ViewModel khác nếu cần
+      ],
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'Mocha App',
+        theme: ThemeData(
+          useMaterial3: true,
+          fontFamily: 'Poppins',
+          scaffoldBackgroundColor: Colors.white,
+          colorSchemeSeed: Colors.blue,
+        ),
+        initialRoute: '/splash',
+        routes: {
+          '/splash': (context) => const SplashScreen(),
+          '/login': (context) => LoginScreen(),
+          '/signup': (context) => const SignupScreen(),
+          '/congratulations': (context) => const CongratulationsScreen(),
+          '/complete-profile': (context) => const CompleteProfileScreen(),
+          '/upload-photo': (context) => const UploadPhotoScreen(),
+          '/home': (context) => const MainPage(),
+          '/chat': (context) => const ChatListScreen(),
+          '/moment': (context) => const MomentsPage(),
+          '/profile': (context) => const ProfilePage(),
+          '/explore': (context) => const ExplorePage(),
+        },
       ),
-
-      // 🔹 Đặt màn hình khởi đầu
-      initialRoute: '/splash',
-
-      // 🔹 Đăng ký tất cả route của app
-      routes: {
-        // 👉 3 màn mới
-        '/splash': (context) => const SplashScreen(),
-        '/login': (context) => const LoginScreen(),
-        '/signup': (context) => const SignupScreen(),
-
-        // 👉 Các màn có sẵn
-        '/congratulations': (context) => const CongratulationsScreen(),
-        '/complete-profile': (context) => const CompleteProfileScreen(),
-        '/upload-photo': (context) => const UploadPhotoScreen(),
-        '/home': (context) => const MainPage(),
-        '/chat': (context) => const ChatListScreen(),
-        '/moment': (context) => const MomentsPage(),
-        '/profile': (context) => const ProfilePage(),
-        '/explore': (context) => const ExplorePage(),
-      },
     );
   }
 }
@@ -115,9 +113,7 @@ class _MainPageState extends State<MainPage> {
         size: 32,
         color: isSelected ? Colors.blue : Colors.grey[500],
       ),
-      onPressed: () {
-        setState(() => _currentIndex = index);
-      },
+      onPressed: () => setState(() => _currentIndex = index),
     );
   }
 }
