@@ -9,7 +9,7 @@ class MessageApi {
   // 📤 SEND MESSAGE
   // ═══════════════════════════════════════════════════════════════
   /// Send a message. Returns normalized map:
-  /// { 'success': bool, 'tempId': String?, 'message': Map<String,dynamic>?, 'error': String? }
+  /// `{ 'success': bool, 'tempId': String?, 'message': Map<String,dynamic>?, 'error': String? }`
   static Future<Map<String, dynamic>> sendMessage(
       Map<String, dynamic> data, {
         String? tempId,

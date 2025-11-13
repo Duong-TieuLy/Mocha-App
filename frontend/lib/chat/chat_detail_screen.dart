@@ -1,11 +1,11 @@
-import 'dart:convert';
+// ✅ REMOVED: import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:frontend/chat/message_api.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:frontend/chat/chat_list_screen.dart';
+// ✅ REMOVED: import 'package:frontend/chat/chat_list_screen.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final String name;
