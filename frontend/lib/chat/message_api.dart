@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 
@@ -81,6 +82,98 @@ class MessageApi {
       }
     } catch (e, st) {
       debugPrint("❌ Error sending message: $e\n$st");
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 📷 SEND IMAGE MESSAGE - ⭐ NEW
+  // ═══════════════════════════════════════════════════════════════
+  /// Send an image message with file upload
+  static Future<Map<String, dynamic>> sendImageMessage({
+    required String conversationId,
+    required String senderId,
+    required File imageFile,
+    String? tempId,
+    Map<String, String>? extraHeaders,
+  }) async {
+    final url = Uri.parse('$baseUrl/messages/image');
+
+    try {
+      debugPrint("📤 Uploading image to: $url");
+      debugPrint("📷 Image path: ${imageFile.path}");
+
+      // Tạo multipart request
+      final request = http.MultipartRequest('POST', url);
+
+      // Thêm headers
+      final headers = {
+        'Accept': 'application/json',
+        if (tempId != null) 'x-temp-id': tempId,
+      };
+      if (extraHeaders != null) headers.addAll(extraHeaders);
+      request.headers.addAll(headers);
+
+      // Thêm fields
+      request.fields['conversationId'] = conversationId;
+      request.fields['senderId'] = senderId;
+      request.fields['type'] = 'image';
+
+      // Thêm file
+      final fileStream = http.ByteStream(imageFile.openRead());
+      final fileLength = await imageFile.length();
+      final multipartFile = http.MultipartFile(
+        'image',
+        fileStream,
+        fileLength,
+        filename: imageFile.path.split('/').last,
+      );
+      request.files.add(multipartFile);
+
+      debugPrint("📦 Uploading file: ${multipartFile.filename} (${fileLength} bytes)");
+
+      // Gửi request
+      final streamedResponse = await request.send().timeout(
+        const Duration(seconds: 60),
+        onTimeout: () => throw Exception('Upload timeout'),
+      );
+
+      final response = await http.Response.fromStream(streamedResponse);
+
+      debugPrint("📩 Response status: ${response.statusCode}");
+      debugPrint("📨 Response body: ${response.body}");
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final body = jsonDecode(response.body);
+
+        Map<String, dynamic>? savedMessage;
+        String? returnedTempId;
+
+        if (body is Map && body.containsKey('message')) {
+          savedMessage = Map<String, dynamic>.from(body['message'] as Map);
+          returnedTempId = body['tempId']?.toString();
+        } else if (body is Map && body.containsKey('id')) {
+          savedMessage = Map<String, dynamic>.from(body);
+          returnedTempId = tempId;
+        }
+
+        return {
+          'success': true,
+          'tempId': returnedTempId ?? tempId,
+          'message': savedMessage,
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'error': response.body,
+        };
+      }
+    } catch (e, st) {
+      debugPrint("❌ Error uploading image: $e\n$st");
       return {
         'success': false,
         'error': e.toString(),

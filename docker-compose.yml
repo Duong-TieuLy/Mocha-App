@@ -1,70 +1,109 @@
 version: "3.8"
 
 services:
-  # ==========================
-  # Auth Service (.NET)
-  # ==========================
-  authservice:
-    build:
-      context: ./backend/AuthService
-      dockerfile: Dockerfile
-    container_name: authservice
-    ports:
-      - "8083:8083"
+  # ========================================
+  # CHAT INFRASTRUCTURE (Kafka Stack)
+  # ========================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.1
+    container_name: zookeeper
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=server=db;port=3306;database=AuthDB;user=root;password=YourStrong@Password123;
-    depends_on:
-      db:
-        condition: service_healthy  # ← Đợi MySQL healthy
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-log:/var/lib/zookeeper/log
     networks:
       - mocha-network
-    restart: on-failure
+    restart: unless-stopped
 
-  # ==========================
-  # User Service (Spring Boot)
-  # ==========================
-  userservice:
-    build:
-      context: ./backend/UserService
-      dockerfile: Dockerfile
-    container_name: userservice
-    ports:
-      - "8082:8082"
+  kafka:
+    image: confluentinc/cp-kafka:7.4.1
+    container_name: kafka
+    depends_on:
+      - zookeeper
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/UserDB
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=YourStrong@Password123
-      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
-      - SPRING_JPA_SHOW_SQL=true
-      - SERVER_PORT=8082
-      - SPRING_APPLICATION_NAME=UserService
-    depends_on:
-      db:
-        condition: service_healthy  # ← Đợi MySQL healthy
-    networks:
-      - mocha-network
-    restart: on-failure  # ← Tự động restart nếu fail
-
-  # ==========================
-  # API Gateway (Ocelot)
-  # ==========================
-  apigateway:
-    build:
-      context: ./backend/ApiGateway
-      dockerfile: Dockerfile
-    container_name: apigateway-mocha
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     ports:
-      - "8000:8080"
-    depends_on:
-      - authservice
-      - userservice
+      - "9092:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
     networks:
       - mocha-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
 
-  # ==========================
-  # MySQL Database
-  # ==========================
+  postgres:
+    image: postgres:15
+    container_name: postgres-chat
+    environment:
+      POSTGRES_DB: chatdb
+      POSTGRES_USER: chat
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - mocha-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chat -d chatdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - mocha-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - mocha-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # ========================================
+  # AUTH & USER SERVICES
+  # ========================================
   db:
     image: mysql:8.0
     container_name: mocha-mysql
@@ -84,15 +123,110 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s  # ← Cho MySQL 30s khởi động
+      start_period: 30s
 
-# ==========================
-# Networks & Volumes
-# ==========================
+  authservice:
+    build:
+      context: ./backend/AuthService
+      dockerfile: Dockerfile
+    container_name: authservice
+    ports:
+      - "8083:8083"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=server=db;port=3306;database=AuthDB;user=root;password=YourStrong@Password123;
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - mocha-network
+    restart: on-failure
+
+  userservice:
+    build:
+      context: ./backend/UserService
+      dockerfile: Dockerfile
+    container_name: userservice
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/UserDB
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=YourStrong@Password123
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_JPA_SHOW_SQL=true
+      - SERVER_PORT=8082
+      - SPRING_APPLICATION_NAME=UserService
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - mocha-network
+    restart: on-failure
+
+  # ========================================
+  # CHAT SERVICE (Node.js)
+  # Thêm service này nếu bạn có ChatService
+  # ========================================
+  # chatservice:
+  #   build:
+  #     context: ./backend/ChatService
+  #     dockerfile: Dockerfile
+  #   container_name: chatservice
+  #   ports:
+  #     - "8084:8084"
+  #   environment:
+  #     - NODE_ENV=production
+  #     - DATABASE_URL=postgresql://chat:secret@postgres:5432/chatdb
+  #     - REDIS_URL=redis://redis:6379
+  #     - KAFKA_BROKERS=kafka:29092
+  #     - MINIO_ENDPOINT=minio:9000
+  #     - MINIO_ACCESS_KEY=minioadmin
+  #     - MINIO_SECRET_KEY=minioadmin
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     kafka:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   networks:
+  #     - mocha-network
+  #   restart: on-failure
+
+  # ========================================
+  # API GATEWAY
+  # ========================================
+  apigateway:
+    build:
+      context: ./backend/ApiGateway
+      dockerfile: Dockerfile
+    container_name: apigateway-mocha
+    ports:
+      - "8000:8080"
+    depends_on:
+      - authservice
+      - userservice
+      # - chatservice  # Uncomment nếu có ChatService
+    networks:
+      - mocha-network
+    restart: on-failure
+
+# ========================================
+# NETWORKS & VOLUMES
+# ========================================
 networks:
   mocha-network:
     name: mocha-network
     driver: bridge
 
 volumes:
+  # Chat infrastructure volumes
+  pgdata:
+  minio-data:
+  kafka-data:
+  zookeeper-data:
+  zookeeper-log:
+
+  # Auth/User volumes
   mysql-data:

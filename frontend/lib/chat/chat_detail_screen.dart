@@ -5,6 +5,8 @@ import 'package:frontend/chat/message_api.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 // ✅ REMOVED: import 'package:frontend/chat/chat_list_screen.dart';
 
 class ChatDetailScreen extends StatefulWidget {
@@ -40,6 +42,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   bool _isLoading = true;
   String? _loadError;
   FlutterSoundRecorder? _recorder;
+  final ImagePicker _imagePicker = ImagePicker();
 
   Timer? _pollTimer;
   bool _isPolling = false;
@@ -494,7 +497,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           children: [
             Row(
               children: [
-                IconButton(icon: const Icon(Icons.camera_alt, color: Colors.grey), onPressed: () {}),
+                IconButton(
+                  icon: const Icon(Icons.camera_alt, color: Colors.grey),
+                  onPressed: _pickImage,
+                ),
                 GestureDetector(
                   onLongPress: _startRecording,
                   onLongPressUp: _stopRecording,
@@ -632,5 +638,163 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       _showEmojiPicker = !_showEmojiPicker;
       if (_showEmojiPicker) FocusScope.of(context).unfocus();
     });
+  }
+
+  Future<void> _pickImage() async {
+    // Hiển thị dialog cho user chọn
+    final source = await showDialog<ImageSource>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Chọn nguồn ảnh'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Thư viện'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Chụp ảnh'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+
+      if (pickedFile == null) return;
+
+      // Hiển thị preview và cho phép gửi
+      if (mounted) {
+        _showImagePreview(File(pickedFile.path));
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi khi chọn ảnh: $e')),
+        );
+      }
+    }
+  }
+
+  void _showImagePreview(File imageFile) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.file(imageFile),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Hủy'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _sendImageMessage(imageFile);
+                    },
+                    child: const Text('Gửi'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _sendImageMessage(File imageFile) async {
+    final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+
+    // Tạo optimistic message với placeholder image
+    final optimistic = {
+      'id': tempId,
+      'text': '[Đang gửi ảnh...]',
+      'senderId': widget.currentUserId,
+      'isSent': true,
+      'status': 'sending',
+      'createdAt': DateTime.now().toIso8601String(),
+      'pending': true,
+      'imageFile': imageFile, // Store local file for display
+    };
+
+    setState(() {
+      messages.add(optimistic);
+    });
+
+    _scrollToBottom();
+
+    // Đánh dấu đã gửi tin nhắn
+    _hasMessageBeenSent = true;
+    widget.onUpdateChatPreview?.call(widget.conversationId, '📷 Ảnh', isTyping: false);
+
+    try {
+      // Upload ảnh lên server
+      final response = await MessageApi.sendImageMessage(
+        conversationId: widget.conversationId,
+        senderId: widget.currentUserId,
+        imageFile: imageFile,
+        tempId: tempId,
+        extraHeaders: widget.extraHeaders,
+      );
+
+      if (response['success'] == true && response['message'] != null) {
+        final saved = Map<String, dynamic>.from(response['message'] as Map);
+        final returnedTempId = response['tempId'] ?? tempId;
+
+        final uiSaved = {
+          'id': saved['id'],
+          'text': saved['content'] ?? saved['text'] ?? '',
+          'imageUrl': saved['imageUrl'] ?? saved['image_url'] ?? saved['url'],
+          'senderId': saved['senderId'] ?? saved['sender_id'] ?? widget.currentUserId,
+          'createdAt': saved['createdAt'] ?? saved['created_at'],
+          'isSent': (saved['senderId'] ?? saved['sender_id'] ?? widget.currentUserId) == widget.currentUserId,
+          'status': saved['status'] != null ? saved['status'].toString().toLowerCase() : 'delivered',
+          'type': 'image',
+        };
+
+        setState(() {
+          final idx = messages.indexWhere((m) => m['id'] == returnedTempId);
+          if (idx != -1) {
+            messages[idx] = uiSaved;
+          } else {
+            messages.add(uiSaved);
+          }
+        });
+
+        _scrollToBottom();
+        widget.onUpdateChatPreview?.call(widget.conversationId, '📷 Ảnh', isTyping: false);
+      } else {
+        _markFailed(tempId);
+      }
+    } catch (e) {
+      debugPrint("❌ Failed to send image: $e");
+      _markFailed(tempId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Không thể gửi ảnh")),
+        );
+      }
+    }
   }
 }
