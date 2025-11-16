@@ -563,7 +563,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.red.withOpacity(0.3)),
+                    border: Border.all(color: Colors.red.withAlpha((0.3 * 255).round())),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -609,7 +609,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                      border: Border.all(color: Colors.orange.withAlpha((0.3 * 255).round())),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -993,7 +993,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final isRecalled = msg['recalled'] == true;
     final createdAt = formatMessageTime(msg['createdAt']);
     final isImage = msg['type'] == 'image';
-    final isPending = msg['pending'] == true;
+    final _isPending = msg['pending'] == true;
     final imageUrl = msg['imageUrl'] ?? msg['content'] ?? '';
 
     Widget statusIcon;

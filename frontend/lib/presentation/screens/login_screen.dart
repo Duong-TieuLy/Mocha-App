@@ -39,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final _data = jsonDecode(response.body);
         setState(() => _output = "✅ Login success!");
         Navigator.pushReplacementNamed(context, '/moment');
       } else {
