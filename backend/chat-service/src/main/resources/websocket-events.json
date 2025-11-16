@@ -1,0 +1,39 @@
+{
+  "client->server": {
+    "send_message": {
+      "tempId": "c1",
+      "conversationId": "conv1",
+      "senderId": "u1",
+      "type": "text",
+      "content": "Hello!"
+    },
+    "read": {
+      "conversationId": "conv1",
+      "messageIds": ["m1","m2"]
+    },
+    "ping": {}
+  },
+  "server->client": {
+    "message_created": {
+      "tempId": "c1",
+      "message": {
+        "id": "m1",
+        "conversationId": "conv1",
+        "senderId": "u1",
+        "content": "Hello!",
+        "type": "text",
+        "createdAt": "..."
+      }
+    },
+    "message_status": {
+      "messageId": "m1",
+      "userId": "u2",
+      "status": "delivered",
+      "timestamp": "..."
+    },
+    "presence": {
+      "userId": "u2",
+      "status": "online"
+    }
+  }
+}

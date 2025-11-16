@@ -1,9 +1,161 @@
 version: "3.8"
 
 services:
-  # ==========================
-  # Auth Service (.NET)
-  # ==========================
+  # ========================================
+  # CHAT INFRASTRUCTURE (Kafka Stack)
+  # ========================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.1
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-log:/var/lib/zookeeper/log
+    networks:
+      - mocha-network
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.1
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - mocha-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  postgres:
+    image: postgres:15
+    container_name: postgres-chat
+    environment:
+      POSTGRES_DB: chatdb
+      POSTGRES_USER: chat
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - mocha-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chat -d chatdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - mocha-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - mocha-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # ========================================
+  # CHAT SERVICE (Spring Boot)
+  # ========================================
+  chatservice:
+    build:
+      context: ./backend/chat-service
+      dockerfile: Dockerfile
+    container_name: chatservice
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-chat:5432/chatdb
+      SPRING_DATASOURCE_USERNAME: chat
+      SPRING_DATASOURCE_PASSWORD: secret
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_APPLICATION_NAME: ChatService
+      SERVER_PORT: 8081
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - mocha-network
+    restart: on-failure
+
+  # ========================================
+  # AUTH & USER SERVICES
+  # ========================================
+  db:
+    image: mysql:8.0
+    container_name: mocha-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: YourStrong@Password123
+      MYSQL_DATABASE: AuthDB
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - mocha-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pYourStrong@Password123"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   authservice:
     build:
       context: ./backend/AuthService
@@ -16,14 +168,11 @@ services:
       - ConnectionStrings__DefaultConnection=server=db;port=3306;database=AuthDB;user=root;password=YourStrong@Password123;
     depends_on:
       db:
-        condition: service_healthy  # ← Đợi MySQL healthy
+        condition: service_healthy
     networks:
       - mocha-network
     restart: on-failure
 
-  # ==========================
-  # User Service (Spring Boot)
-  # ==========================
   userservice:
     build:
       context: ./backend/UserService
@@ -69,11 +218,11 @@ services:
       - db
     networks:
       - mocha-network
-    restart: on-failure  # ← Tự động restart nếu fail
+    restart: on-failure
 
-  # ==========================
-  # API Gateway (Ocelot)
-  # ==========================
+  # ========================================
+  # API GATEWAY
+  # ========================================
   apigateway:
     build:
       context: ./backend/ApiGateway
@@ -87,38 +236,20 @@ services:
       - postservice
     networks:
       - mocha-network
+    restart: on-failure
 
-  # ==========================
-  # MySQL Database
-  # ==========================
-  db:
-    image: mysql:8.0
-    container_name: mocha-mysql
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: YourStrong@Password123
-      MYSQL_DATABASE: AuthDB
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql-data:/var/lib/mysql
-      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - mocha-network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pYourStrong@Password123"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s  # ← Cho MySQL 30s khởi động
-
-# ==========================
-# Networks & Volumes
-# ==========================
+# ========================================
+# NETWORKS & VOLUMES
+# ========================================
 networks:
   mocha-network:
     name: mocha-network
     driver: bridge
 
 volumes:
+  pgdata:
+  minio-data:
+  kafka-data:
+  zookeeper-data:
+  zookeeper-log:
   mysql-data:

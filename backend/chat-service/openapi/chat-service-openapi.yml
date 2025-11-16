@@ -1,0 +1,48 @@
+openapi: 3.0.3
+info:
+  title: Chat Service API
+  version: 0.1.0
+paths:
+  /api/messages:
+    post:
+      summary: Send message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Message'
+      responses:
+        '200':
+          description: saved message
+  /api/messages/{conversationId}:
+    get:
+      parameters:
+        - in: path
+          name: conversationId
+          schema:
+            type: string
+      responses:
+        '200':
+          description: message history
+components:
+  schemas:
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+        conversationId:
+          type: string
+        senderId:
+          type: string
+        content:
+          type: string
+        type:
+          type: string
+          enum: [text,image,voice,sticker]
+        attachmentUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time

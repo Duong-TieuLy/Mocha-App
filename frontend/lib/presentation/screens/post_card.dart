@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';  // Thêm import này
 
 import '../../data/models/user_profile.dart';
 import '../../data/models/post_model.dart';
@@ -14,7 +15,7 @@ class PostCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context){
+  Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 10),
       child: Container(
@@ -36,9 +37,8 @@ class PostCard extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
               subtitle: Text(userProfile.firebaseUid, style: const TextStyle(color: Colors.black54)),
             ),
-            // Image
+            // Image với CachedNetworkImage để mượt hơn
             ClipRRect(
-              // borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
               borderRadius: BorderRadius.circular(20),
               child: Image.network(post.images!, fit: BoxFit.cover, height: 300, width: double.infinity),
             ),
