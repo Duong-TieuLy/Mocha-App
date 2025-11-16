@@ -38,7 +38,7 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthViewModel()),
         // Add các ViewModel khác nếu cần
-        ChangeNotifierProvider(create: (_) => UserViewModel(repository: UserRepository(userService: UserService(baseUrl: 'http://10.0.2.2:8000'))))
+        ChangeNotifierProvider(create: (_) => UserViewModel(repository: UserRepository(userService: UserService(baseUrl: 'http://10.0.2.2:8000')))),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

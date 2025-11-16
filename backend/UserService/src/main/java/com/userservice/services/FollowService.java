@@ -1,158 +1,170 @@
 package com.userservice.services;
 
 import com.userservice.models.User;
+import com.userservice.models.Friend;
 import com.userservice.repositories.UserRepository;
+import com.userservice.repositories.FriendRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import jakarta.persistence.EntityManager;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class FollowService {
 
+    private static final Logger log = LoggerFactory.getLogger(FollowService.class);
+
     private final UserRepository userRepository;
-    private final FriendService friendService;
-    private final EntityManager entityManager;
+    private final FriendRepository friendRepository;
 
     /**
-     * Follow user và tự động tạo friendship nếu mutual follow
+     * Follow một user
+     * Nếu follow qua lại → tạo quan hệ bạn bè
      */
     @Transactional
-    public void followUser(Long followerId, Long followingId) {
-        log.info("==> START followUser: {} -> {}", followerId, followingId);
-        
-        if (followerId.equals(followingId)) {
-            throw new IllegalArgumentException("Cannot follow yourself");
+    public void followUser(String currentUserFirebaseUid, Long targetUserId) {
+
+        User currentUser = userRepository.findByFirebaseUid(currentUserFirebaseUid)
+                .orElseThrow(() -> new RuntimeException("Current user not found"));
+
+        User targetUser = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new RuntimeException("Target user not found"));
+
+        if (currentUser.getId().equals(targetUser.getId())) {
+            throw new RuntimeException("Cannot follow yourself");
         }
 
-        // ✅ Kiểm tra users tồn tại
-        if (!userRepository.existsById(followerId)) {
-            throw new RuntimeException("Follower not found: " + followerId);
-        }
-        if (!userRepository.existsById(followingId)) {
-            throw new RuntimeException("User to follow not found: " + followingId);
+        // Kiểm tra đã follow chưa
+        if (currentUser.getFollowing().contains(targetUser)) {
+            throw new RuntimeException("Already following this user");
         }
 
-        // ✅ Kiểm tra đã follow chưa
-        boolean alreadyFollowing = userRepository.isFollowing(followerId, followingId);
-        if (alreadyFollowing) {
-            log.warn("User {} already following user {}", followerId, followingId);
-            throw new IllegalStateException("Already following this user");
+        // Lưu follow
+        currentUser.getFollowing().add(targetUser);
+        userRepository.saveAndFlush(currentUser); // đảm bảo insert record
+
+        // Nếu target cũng follow current → tạo friend
+        if (targetUser.getFollowing().contains(currentUser)) {
+            createFriendship(currentUser, targetUser);
         }
 
-        log.debug("All checks passed, inserting follow relationship");
-
-        // ✅ CRITICAL FIX: Insert trực tiếp vào bảng join, tránh lazy loading
-        userRepository.insertFollowing(followerId, followingId);
-        
-        // ✅ Flush để đảm bảo data được persist
-        entityManager.flush();
-        
-        log.info("✅ User {} followed user {} successfully", followerId, followingId);
-
-        // ✅ Kiểm tra và tạo friendship nếu mutual follow
-        try {
-            friendService.createFriendshipIfMutualFollow(followerId, followingId);
-        } catch (Exception e) {
-            log.error("❌ Error creating friendship between {} and {}: {}", 
-                     followerId, followingId, e.getMessage(), e);
-            // Không throw exception để follow vẫn thành công
-        }
-        
-        log.info("==> END followUser: {} -> {}", followerId, followingId);
+        log.info("User {} followed user {}", currentUser.getId(), targetUser.getId());
     }
 
     /**
-     * Unfollow user và xóa friendship
+     * Unfollow một user
+     * Nếu đang là bạn → gỡ friend
      */
     @Transactional
-    public void unfollowUser(Long followerId, Long followingId) {
-        log.info("==> START unfollowUser: {} -> {}", followerId, followingId);
-        
-        // ✅ Kiểm tra users tồn tại
-        if (!userRepository.existsById(followerId)) {
-            throw new RuntimeException("Follower not found: " + followerId);
-        }
-        if (!userRepository.existsById(followingId)) {
-            throw new RuntimeException("User not found: " + followingId);
-        }
+    public void unfollowUser(String currentUserFirebaseUid, Long targetUserId) {
 
-        // ✅ Kiểm tra có đang follow không
-        boolean isFollowing = userRepository.isFollowing(followerId, followingId);
-        if (!isFollowing) {
-            throw new IllegalStateException("Not following this user");
-        }
+        User currentUser = userRepository.findByFirebaseUid(currentUserFirebaseUid)
+                .orElseThrow(() -> new RuntimeException("Current user not found"));
 
-        // ✅ Thực hiện unfollow bằng native query
-        userRepository.deleteFollowing(followerId, followingId);
-        
-        // ✅ Flush ngay
-        entityManager.flush();
+        User targetUser = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new RuntimeException("Target user not found"));
 
-        log.info("✅ User {} unfollowed user {}", followerId, followingId);
+        currentUser.getFollowing().remove(targetUser);
+        userRepository.save(currentUser);
 
-        // Xóa friendship nếu tồn tại
-        try {
-            friendService.deleteFriendshipIfExists(followerId, followingId);
-        } catch (Exception e) {
-            log.error("❌ Error deleting friendship between {} and {}: {}", 
-                     followerId, followingId, e.getMessage(), e);
-        }
-        
-        log.info("==> END unfollowUser: {} -> {}", followerId, followingId);
+        // Gỡ friend nếu có
+        friendRepository.findByUsers(currentUser.getId(), targetUser.getId())
+                .ifPresent(friendRepository::delete);
+
+        log.info("User {} unfollowed user {}", currentUser.getId(), targetUser.getId());
     }
 
     /**
-     * Lấy danh sách người đang follow
+     * Tạo quan hệ bạn bè khi follow qua lại
      */
-    @Transactional(readOnly = true)
-    public List<User> getFollowing(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
-        return user.getFollowing().stream().collect(Collectors.toList());
+    @Transactional
+    public void createFriendship(User a, User b) {
+        if (friendRepository.findByUsers(a.getId(), b.getId()).isPresent()) return;
+
+        Friend f = new Friend();
+        if (a.getId() < b.getId()) {
+            f.setUser1(a);
+            f.setUser2(b);
+        } else {
+            f.setUser1(b);
+            f.setUser2(a);
+        }
+
+        friendRepository.save(f);
+        log.info("Friendship created between {} and {}", a.getId(), b.getId());
+    }
+
+    /**
+     * Unfriend trực tiếp (không liên quan follow)
+     */
+    @Transactional
+    public void unfriend(String currentUserFirebaseUid, Long targetUserId) {
+
+        User currentUser = userRepository.findByFirebaseUid(currentUserFirebaseUid)
+                .orElseThrow(() -> new RuntimeException("Current user not found"));
+
+        Friend friendship = friendRepository.findByUsers(currentUser.getId(), targetUserId)
+                .orElseThrow(() -> new RuntimeException("Not friends"));
+
+        friendRepository.delete(friendship);
+        log.info("Friendship removed between {} and {}", currentUser.getId(), targetUserId);
+    }
+
+    /**
+     * Kiểm tra đang follow
+     */
+    public boolean isFollowing(String currentUserFirebaseUid, Long targetUserId) {
+        User currentUser = userRepository.findByFirebaseUid(currentUserFirebaseUid)
+                .orElseThrow(() -> new RuntimeException("Current user not found"));
+        return currentUser.getFollowing().stream()
+                .anyMatch(u -> u.getId().equals(targetUserId));
+    }
+
+    /**
+     * Kiểm tra có phải bạn bè
+     */
+    public boolean areFriends(String currentUserFirebaseUid, Long targetUserId) {
+        User currentUser = userRepository.findByFirebaseUid(currentUserFirebaseUid)
+                .orElseThrow(() -> new RuntimeException("Current user not found"));
+        return friendRepository.findByUsers(currentUser.getId(), targetUserId).isPresent();
     }
 
     /**
      * Lấy danh sách followers
      */
-    @Transactional(readOnly = true)
-    public List<User> getFollowers(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
-        return user.getFollowers().stream().collect(Collectors.toList());
+    public Set<User> getFollowers(String currentUserFirebaseUid) {
+        User currentUser = userRepository.findByFirebaseUid(currentUserFirebaseUid)
+                .orElseThrow(() -> new RuntimeException("Current user not found"));
+        return currentUser.getFollowers();
     }
 
     /**
-     * Đếm số người đang follow
+     * Lấy danh sách following
      */
-    @Transactional(readOnly = true)
-    public long countFollowing(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
-        return user.getFollowing().size();
+    public Set<User> getFollowing(String currentUserFirebaseUid) {
+        User currentUser = userRepository.findByFirebaseUid(currentUserFirebaseUid)
+                .orElseThrow(() -> new RuntimeException("Current user not found"));
+        return currentUser.getFollowing();
     }
 
     /**
-     * Đếm số followers
+     * Thống kê follow/following
      */
-    @Transactional(readOnly = true)
-    public long countFollowers(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
-        return user.getFollowers().size();
-    }
-
-    /**
-     * Kiểm tra user A có đang follow user B không
-     */
-    @Transactional(readOnly = true)
-    public boolean isFollowing(Long followerId, Long followingId) {
-        return userRepository.isFollowing(followerId, followingId);
+    public Map<String, Long> getFollowStats(String currentUserFirebaseUid) {
+        User currentUser = userRepository.findByFirebaseUid(currentUserFirebaseUid)
+                .orElseThrow(() -> new RuntimeException("Current user not found"));
+        Map<String, Long> stats = new HashMap<>();
+        stats.put("followers", (long) currentUser.getFollowers().size());
+        stats.put("following", (long) currentUser.getFollowing().size());
+        stats.put("friends", friendRepository.countFriendsByUserId(currentUser.getId()));
+        return stats;
     }
 }

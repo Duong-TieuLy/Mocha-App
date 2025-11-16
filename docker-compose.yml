@@ -42,6 +42,8 @@ services:
     depends_on:
       db:
         condition: service_healthy  # ← Đợi MySQL healthy
+    volumes:
+      - ./uploads:/app/uploads
     networks:
       - mocha-network
     restart: on-failure  # ← Tự động restart nếu fail

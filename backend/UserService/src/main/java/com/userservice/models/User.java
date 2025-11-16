@@ -6,12 +6,11 @@ import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import com.userservice.enums.Gender;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Entity
 @Table(name = "users")
@@ -26,17 +25,29 @@ public class User {
     private String firebaseUid;
 
     @Column(nullable = false, unique = true)
-    private String email; // ✅ thêm email
+    private String email;
 
     private String fullName;
 
     @Column(unique = true)
     private String username;
 
+    private LocalDate dateOfBirth;
+
+    private String location;
+
+    @Enumerated(EnumType.STRING)
+    private Gender gender;
+
+    private String phoneNumber;
+
     @Column(length = 500)
     private String bio;
 
-    private String interests;
+    @ElementCollection
+    @Column(name = "interest")
+    private List<String> interests = new ArrayList<>();
+
     private String photoUrl;
 
     @CreationTimestamp
@@ -54,26 +65,47 @@ public class User {
     @JsonManagedReference
     private UserStatus status;
 
-    // 🔹 Người này đang theo dõi ai
+    // ===========================================
+    //                FOLLOW SYSTEM
+    // ===========================================
+
+    // Người này đang follow ai
     @ManyToMany
     @JoinTable(
             name = "user_following",
             joinColumns = @JoinColumn(name = "follower_id"),
             inverseJoinColumns = @JoinColumn(name = "following_id")
     )
+    @JsonIgnore
     private Set<User> following = new HashSet<>();
 
-    // 🔹 Ai đang theo dõi người này
+    // Ai đang follow người này
     @ManyToMany(mappedBy = "following")
+    @JsonIgnore
     private Set<User> followers = new HashSet<>();
 
-    // Quan hệ với Friendship - Lời mời đã gửi
-    @OneToMany(mappedBy = "user1", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonManagedReference("user-sent-requests")
-    private List<Friend> sentFriendRequests = new ArrayList<>();
 
-    // Quan hệ với Friendship - Lời mời đã nhận
-    @OneToMany(mappedBy = "user2", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonManagedReference("user-received-requests")
-    private List<Friend> receivedFriendRequests = new ArrayList<>();
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof User)) return false;
+        return id != null && id.equals(((User) o).id);
+    }
+
+    @Override
+    public int hashCode() {
+        return 31;
+    }
+
+    // ===========================================
+    //                FRIEND SYSTEM
+    // ===========================================
+
+//    @OneToMany(mappedBy = "user1")
+//    @JsonIgnore
+//    private List<Friend> sentFriendRequests = new ArrayList<>();
+//
+//    @OneToMany(mappedBy = "user2")
+//    @JsonIgnore
+//    private List<Friend> receivedFriendRequests = new ArrayList<>();
 }

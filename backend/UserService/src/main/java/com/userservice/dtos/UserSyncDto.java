@@ -1,6 +1,7 @@
 package com.userservice.dtos;
 
 import lombok.Data;
+import java.util.List;
 
 @Data
 public class UserSyncDto {
@@ -9,6 +10,6 @@ public class UserSyncDto {
     private String fullName;
     private String username;
     private String bio;
-    private String interests;
+    private List<String> interests;
     private String photoUrl;
 }

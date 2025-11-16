@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/presentation/screens/post_card.dart';
+import 'search_screen.dart';
 
 class MomentsPage extends StatefulWidget {
   const MomentsPage({super.key});
@@ -31,11 +32,28 @@ class _MomentsPageState extends State<MomentsPage> {
             color: Colors.black,
           ),
         ),
-        actions: const [
-          Icon(Icons.search, color: Colors.black, size: 36),
-          SizedBox(width: 16),
-          Icon(Icons.notifications_none, color: Colors.black, size: 36),
-          SizedBox(width: 16),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search, color: Colors.black, size: 36),
+            onPressed: () {
+              // Hiển thị SearchScreen dưới dạng bottom sheet
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true, // Cho phép điều chỉnh kích thước
+                backgroundColor: Colors.white,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                builder: (context) => FractionallySizedBox(
+                  heightFactor: 0.9, // Chiếm 80% chiều cao màn hình (8/10)
+                  child: const SearchScreen(),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 16),
+          const Icon(Icons.notifications_none, color: Colors.black, size: 36),
+          const SizedBox(width: 16),
         ],
       ),
 

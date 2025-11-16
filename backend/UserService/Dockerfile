@@ -13,6 +13,8 @@ RUN mvn clean package -DskipTests
 # === Giai đoạn chạy ===
 FROM eclipse-temurin:21-jdk
 WORKDIR /app
+
+RUN mkdir -p /app/uploads/avatars
 COPY --from=build /app/target/UserService-0.0.1-SNAPSHOT.jar app.jar
 
 EXPOSE 8082
