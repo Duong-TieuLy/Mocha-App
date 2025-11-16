@@ -1,4 +1,3 @@
-
 package com.userservice.models;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
@@ -6,20 +5,22 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "friendships", 
-       uniqueConstraints = {
-           @UniqueConstraint(columnNames = {"user_id_1", "user_id_2"})
-       },
-       indexes = {
-           @Index(name = "idx_user1", columnList = "user_id_1"),
-           @Index(name = "idx_user2", columnList = "user_id_2")
-       })
+@Table(name = "friendships",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"user_id_1", "user_id_2"})
+        },
+        indexes = {
+                @Index(name = "idx_user1", columnList = "user_id_1"),
+                @Index(name = "idx_user2", columnList = "user_id_2")
+        })
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@ToString(exclude = {"user1", "user2"}) // Tránh circular reference khi log
 public class Friend {
 
     @Id
@@ -31,15 +32,15 @@ public class Friend {
      * để tránh duplicate (A-B và B-A)
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id_1", nullable = false, 
-                foreignKey = @ForeignKey(name = "fk_friendship_user1"))
-    @JsonBackReference
+    @JoinColumn(name = "user_id_1", nullable = false,
+            foreignKey = @ForeignKey(name = "fk_friendship_user1"))
+    @JsonBackReference("user1-friendship")
     private User user1;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id_2", nullable = false,
-                foreignKey = @ForeignKey(name = "fk_friendship_user2"))
-    @JsonBackReference
+            foreignKey = @ForeignKey(name = "fk_friendship_user2"))
+    @JsonBackReference("user2-friendship")
     private User user2;
 
     @Column(nullable = false, updatable = false)
@@ -53,7 +54,7 @@ public class Friend {
     // Helper methods
     public boolean involves(Long userId) {
         return (user1 != null && user1.getId().equals(userId)) ||
-               (user2 != null && user2.getId().equals(userId));
+                (user2 != null && user2.getId().equals(userId));
     }
 
     public User getOtherUser(Long userId) {

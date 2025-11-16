@@ -336,34 +336,9 @@ class _ExplorePageState extends State<ExplorePage> {
               width: double.infinity,
               fit: BoxFit.cover,
             ),
-          ),
-          const SizedBox(height: 12),
-          // Like / Comment / Share
-          Row(
-            children: [
-              const Icon(Icons.favorite, color: Colors.red, size: 22),
-              const SizedBox(width: 6),
-              Text(
-                likes >= 1000
-                    ? "${(likes / 1000).toStringAsFixed(1)}K"
-                    : likes.toString(),
-                style:
-                const TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
-              ),
-              const SizedBox(width: 18),
-              const Icon(Icons.chat_bubble_outline, color: Colors.black, size: 22),
-              const SizedBox(width: 6),
-              Text(
-                comments.toString(),
-                style:
-                const TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
-              ),
-              const Spacer(),
-              const Icon(Icons.send_outlined, color: Colors.black),
-            ],
-          ),
-        ],
-      ),
+          ],
+        ),
+      )
     );
   }
 }

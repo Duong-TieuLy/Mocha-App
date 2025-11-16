@@ -1,6 +1,7 @@
 package com.userservice.controllers;
 
 import com.userservice.dtos.UserProfileDto;
+import com.userservice.dtos.UserSyncDto;
 import com.userservice.mapper.UserMapper;
 import com.userservice.models.User;
 import com.userservice.services.UserService;
@@ -8,8 +9,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/users")
@@ -23,30 +26,54 @@ public class UserController {
 
     // Tìm user theo email hoặc tên hiển thị
     @GetMapping("/search")
-    public ResponseEntity<List<User>> searchUsers(
-            @RequestParam(required = false) String email,
-            @RequestParam(required = false) String name) {
+    public ResponseEntity<List<UserProfileDto>> searchUsers(
+            @RequestHeader("X-User-Id") String uid,
+            @RequestParam(required = false) String keyword) {
 
-        if (email != null) {
-            return service.findByEmail(email)
-                    .map(user -> ResponseEntity.ok(List.of(user)))
-                    .orElse(ResponseEntity.ok(List.of()));
-        } else if (name != null) {
-            return ResponseEntity.ok(service.searchByFullName(name));
+        log.info("🔍 GET /api/users/search — keyword={}, uid={}", keyword, uid);
+
+        if (keyword == null || keyword.trim().isEmpty()) {
+            log.warn("⚠️ Search keyword is empty");
+            return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok(List.of());
+
+        List<User> users = service.searchUsers(keyword, uid); // truyền uid để loại bỏ bản thân
+
+        List<UserProfileDto> result = users.stream()
+                .map(UserMapper::toProfileDto)
+                .collect(Collectors.toList());
+
+        log.info("✅ Found {} users matching keyword: {}", result.size(), keyword);
+        return ResponseEntity.ok(result);
     }
 
+
     @GetMapping("/me")
-    public ResponseEntity<User> getProfile(@RequestHeader("X-User-Id") String uid) {
+    public ResponseEntity<UserProfileDto> getMyProfile(
+            @RequestHeader("X-User-Id") String uid) {
+
         log.info("📥 GET /api/users/me — uid={}", uid);
 
-        return service.findByFirebaseUid(uid)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> {
-                    log.warn("⚠️ User not found for uid={}", uid);
-                    return ResponseEntity.notFound().build();
-                });
+        UserProfileDto dto = service.getUserProfile(uid);
+        if (dto == null) {
+            log.warn("⚠️ User not found for uid={}", uid);
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(dto);
+    }
+
+    @GetMapping("/{uid}")
+    public ResponseEntity<UserProfileDto> getUserProfile(@PathVariable String uid) {
+
+        log.info("📥 GET /api/users/{} — getting profile", uid);
+
+        UserProfileDto dto = service.getUserProfile(uid);
+        if (dto == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(dto);
     }
 
     /**
@@ -61,15 +88,29 @@ public class UserController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PostMapping(value = "/upload-photo", consumes = "multipart/form-data")
+    public ResponseEntity<String> uploadPhoto(
+            @RequestHeader("X-User-Id") String uid,
+            @RequestPart("file") MultipartFile file) {
+
+        try {
+            String url = service.uploadUserAvatar(uid, file);
+            return ResponseEntity.ok(url);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Upload failed");
+        }
+    }
+
+
     /**
      * 🔹 Cập nhật hồ sơ người dùng
      */
     @PutMapping("/me")
     public ResponseEntity<User> updateProfile(
             @RequestHeader("X-User-Id") String uid,
-            @RequestBody User updated) {
-        log.info("📤 PUT /api/users/me — uid={}, update={}", uid, updated);
-        User saved = service.updateProfile(uid, updated);
+            @RequestBody UserProfileDto dto) {
+        log.info("📤 PUT /api/users/me — uid={}, updateDto={}", uid, dto);
+        User saved = service.updateProfileFromDto(uid, dto);
         return ResponseEntity.ok(saved);
     }
 
@@ -77,16 +118,23 @@ public class UserController {
      * 🔹 Đồng bộ user từ AuthService
      */
     @PostMapping("/sync")
-    public ResponseEntity<User> syncUser(@RequestBody User newUser) {
-        log.info("🔄 POST /api/users/sync — data={}", newUser);
+    public ResponseEntity<User> syncUser(@RequestBody UserSyncDto dto) {
+        log.info("🔄 POST /api/users/sync — data={}", dto);
 
-        if (newUser.getFirebaseUid() == null || newUser.getFirebaseUid().isEmpty()) {
+        if (dto.getFirebaseUid() == null || dto.getFirebaseUid().isEmpty()) {
             log.error("❌ Missing firebaseUid in sync request");
             return ResponseEntity.badRequest().build();
         }
+        User user = new User();
+        user.setFirebaseUid(dto.getFirebaseUid());
+        user.setEmail(dto.getEmail());
+        user.setFullName(dto.getFullName());
+        user.setUsername(dto.getUsername());
+        user.setBio(dto.getBio());
+        user.setInterests(dto.getInterests());
+        user.setPhotoUrl(dto.getPhotoUrl());
 
-        User saved = service.syncUser(newUser);
-        log.info("✅ Synced user with firebaseUid={}", saved.getFirebaseUid());
+        User saved = service.syncUser(user);
         return ResponseEntity.ok(saved);
     }
 }

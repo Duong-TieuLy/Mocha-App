@@ -13,38 +13,57 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User,Long> {
     Optional<User> findByFirebaseUid(String firebaseUid);
-    // Tìm theo tên hiển thị (có thể match một phần)
-    List<User> findByFullName(String fullName);
-
-    Optional<User> findByEmail(String email);
 
     /**
-     * ✅ Kiểm tra user có đang follow user khác không (dùng query trực tiếp - FAST)
-     * Tránh lazy loading N+1 problem
+     * ✅ Tìm kiếm user theo từ khóa trong CẢ fullName VÀ email
+     * Trả về kết quả nếu từ khóa xuất hiện trong bất kỳ trường nào
      */
-    @Query("SELECT CASE WHEN COUNT(f) > 0 THEN true ELSE false END " +
-           "FROM User u JOIN u.following f " +
-           "WHERE u.id = :followerId AND f.id = :followingId")
-    boolean isFollowing(@Param("followerId") Long followerId, 
-                       @Param("followingId") Long followingId);
-    
+    @Query("SELECT DISTINCT u FROM User u WHERE " +
+            "LOWER(u.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+    List<User> searchByKeyword(@Param("keyword") String keyword);
+
     /**
-     * ✅ Thêm follow relationship trực tiếp vào bảng join (tránh lazy loading)
-     * CRITICAL: Dùng native query để insert trực tiếp, không trigger lazy loading
+     * Lấy danh sách người đang follow user này
      */
-    @Modifying
-    @Query(value = "INSERT INTO user_following (follower_id, following_id) VALUES (:followerId, :followingId)", 
-           nativeQuery = true)
-    void insertFollowing(@Param("followerId") Long followerId, 
-                        @Param("followingId") Long followingId);
-    
+    @Query("SELECT u FROM User u JOIN u.following f WHERE f.id = :userId")
+    List<User> findFollowers(@Param("userId") Long userId);
+
     /**
-     * ✅ Xóa follow relationship trực tiếp (tránh lazy loading)
+     * Lấy danh sách người mà user này đang follow
      */
-    @Modifying
-    @Query(value = "DELETE FROM user_following WHERE follower_id = :followerId AND following_id = :followingId", 
-           nativeQuery = true)
-    void deleteFollowing(@Param("followerId") Long followerId, 
-                        @Param("followingId") Long followingId);
+    @Query("SELECT f FROM User u JOIN u.following f WHERE u.id = :userId")
+    List<User> findFollowing(@Param("userId") Long userId);
+
+    /**
+     * Đếm số người follow
+     */
+    @Query("SELECT COUNT(u) FROM User u JOIN u.following f WHERE f.id = :userId")
+    long countFollowers(@Param("userId") Long userId);
+
+    /**
+     * Đếm số người đang follow
+     */
+    @Query("SELECT COUNT(f) FROM User u JOIN u.following f WHERE u.id = :userId")
+    long countFollowing(@Param("userId") Long userId);
+
+    /**
+     * Tìm user theo ID và eager load following relationship
+     */
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.following WHERE u.id = :userId")
+    Optional<User> findByIdWithFollowing(@Param("userId") Long userId);
+
+    /**
+     * Tìm user theo Firebase UID và eager load following relationship
+     */
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.following WHERE u.firebaseUid = :firebaseUid")
+    Optional<User> findByFirebaseUidWithFollowing(@Param("firebaseUid") String firebaseUid);
+
+    /**
+     * Kiểm tra xem user1 có đang follow user2 không
+     */
+    @Query("SELECT COUNT(u) > 0 FROM User u JOIN u.following f WHERE u.id = :userId AND f.id = :targetId")
+    boolean isUserFollowingTarget(@Param("userId") Long userId, @Param("targetId") Long targetId);
 }
+
 

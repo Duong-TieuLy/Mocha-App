@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using AuthService.Repositories;
 using AuthService.Models;
-using AuthService.Dtos;
 using FirebaseAdmin.Auth;
 using System.Net.Http.Json;
+using AuthService.Dtos;
 
 namespace AuthService.Services
 {
@@ -88,13 +88,59 @@ namespace AuthService.Services
         {
             try
             {
+                // 1️⃣ Verify Firebase token
                 var uid = await _firebaseAuthService.VerifyIdTokenAsync(request.IdToken);
 
+                // 2️⃣ Kiểm tra Auth DB
                 var user = await _authUserRepository.GetByFirebaseUidAsync(uid);
-                if (user == null)
-                    return NotFound("User not found in Auth DB.");
+                bool isNewUser = false;
 
-                return Ok(new { uid = user.FirebaseUid, email = user.Email, role = user.Role });
+                if (user == null)
+                {
+                    // Tạo AuthUser mới nếu chưa tồn tại
+                    var firebaseUser = await FirebaseAuth.DefaultInstance.GetUserAsync(uid);
+                    user = new AuthUser
+                    {
+                        FirebaseUid = firebaseUser.Uid,
+                        Email = firebaseUser.Email,
+                        DisplayName = firebaseUser.DisplayName,
+                        Role = "User",
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    await _authUserRepository.AddAsync(user);
+                    isNewUser = true;
+
+                    Console.WriteLine($"✅ Created new AuthUser for uid={uid}");
+                }
+
+                // 3️⃣ Luôn đồng bộ sang UserService
+                try
+                {
+                    var http = _httpClientFactory.CreateClient();
+                    var syncData = new
+                    {
+                        firebaseUid = user.FirebaseUid,
+                        email = user.Email,
+                        fullName = user.DisplayName
+                    };
+
+                    var response = await http.PostAsJsonAsync("http://userservice:8082/api/users/sync", syncData);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        Console.WriteLine($"✅ Synced user {user.FirebaseUid} to UserService");
+                    }
+                    else
+                    {
+                        var body = await response.Content.ReadAsStringAsync();
+                        Console.WriteLine($"⚠️ Failed to sync user {user.FirebaseUid}: {response.StatusCode}, {body}");
+                    }
+                }
+                catch (HttpRequestException ex)
+                {
+                    Console.WriteLine($"🚫 Error calling UserService: {ex.Message}");
+                }
+
+                return Ok(new { uid = user.FirebaseUid, email = user.Email, role = user.Role, isNewUser });
             }
             catch (Exception ex)
             {

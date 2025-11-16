@@ -21,7 +21,7 @@
                 entity.HasKey(u => u.Id);
                 entity.HasIndex(u => u.FirebaseUid).IsUnique();
                 entity.Property(u => u.Email).IsRequired();
-                entity.Property(u => u.Role).HasDefaultValue("Customer");
+                entity.Property(u => u.Role).HasDefaultValue("User");
             });
         }
     }

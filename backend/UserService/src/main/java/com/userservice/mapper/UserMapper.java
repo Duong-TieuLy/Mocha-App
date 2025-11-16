@@ -14,9 +14,15 @@ public class UserMapper {
         dto.setId(user.getId());
         dto.setFirebaseUid(user.getFirebaseUid());
         dto.setFullName(user.getFullName());
+        dto.setUsername(user.getUsername());
+        dto.setEmail(user.getEmail());
         dto.setBio(user.getBio());
         dto.setInterests(user.getInterests());
         dto.setPhotoUrl(user.getPhotoUrl());
+        dto.setPhotoUrl(user.getPhotoUrl());
+        dto.setLocation(user.getLocation());
+        dto.setDateOfBirth(user.getDateOfBirth());
+        dto.setGender(user.getGender());
 
         // Đếm follower/following an toàn
         dto.setFollowersCount(user.getFollowers() != null ? user.getFollowers().size() : 0);
