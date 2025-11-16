@@ -33,6 +33,14 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at timestamptz DEFAULT now()
 );
 
+CREATE TABLE blocked_users (
+    id serial PRIMARY KEY,
+    user_id varchar NOT NULL REFERENCES users(id),
+    blocked_user_id varchar NOT NULL REFERENCES users(id),
+    created_at timestamptz DEFAULT now(),
+    UNIQUE(user_id, blocked_user_id)
+);
+
 CREATE INDEX idx_messages_conv_created ON messages(conversation_id, created_at);
 
 -- message_status: per recipient

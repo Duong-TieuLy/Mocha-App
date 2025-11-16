@@ -77,6 +77,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
+  // ⭐ Track conversations that should appear in list
+  // Only conversations with messages sent in current session
+  final Set<String> _activeConversations = {};
+
   final List<ChatPreview> _friends = [
     ChatPreview(
       conversationId: 'You',
@@ -130,12 +134,27 @@ class _ChatListScreenState extends State<ChatListScreen> {
     }).toList();
   }
 
+  void _startTimeUpdateTimer() {
+    _timeUpdateTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (!mounted) return;
+      setState(() {
+        for (var i = 0; i < _chats.length; i++) {
+          final chat = _chats[i];
+          if (chat.lastMessageTime != null) {
+            _chats[i] = chat.copyWith(time: _formatTime(chat.lastMessageTime!));
+          }
+        }
+      });
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     _currentUserId = widget.currentUserId ?? 'bella';
     _loadChatsFromApi();
     _startAutoRefresh();
+    _startTimeUpdateTimer();
 
     _searchController.addListener(() {
       setState(() {
@@ -147,6 +166,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _timeUpdateTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -176,160 +196,107 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
       if (conversations.isEmpty) {
         if (!silent) {
-          debugPrint('║ ⚠️  API returned empty list');
+          debugPrint('║ ℹ️  API returned empty conversations');
         }
 
-        // ⭐ CHỈ INIT HARDCODED CHO TOMMY VÀ BELLA
         if (!_hasInitialized && _chats.isEmpty) {
           if (_currentUserId == 'tommy' || _currentUserId == 'bella') {
-            debugPrint('║ 💡 Tommy/Bella - using hardcoded data with real messages');
+            debugPrint('║ 💡 First time - using hardcoded data with real messages');
             await _initChatsHardcoded();
           } else {
-            debugPrint('║ 🚫 Other user ($_currentUserId) - starting with empty chat list');
+            debugPrint('║ 🚫 First time - starting with empty chat list');
             setState(() {
               _chats = [];
               _hasInitialized = true;
             });
           }
         } else {
-          debugPrint('║ ✅ Keeping existing chat data (${_chats.length} chats)');
-        }
-      } else {
-        final newChats = conversations.map((conv) {
-          return ChatPreview(
-            conversationId: conv['conversationId']?.toString() ?? '',
-            name: conv['otherUserName']?.toString() ?? 'Unknown',
-            avatar: conv['otherUserAvatar']?.toString() ?? 'assets/images/default.png',
-            userId: conv['otherUserId']?.toString() ?? '',
-            lastMessage: conv['lastMessage']?.toString() ?? '',
-            time: _formatTimeFromString(conv['lastMessageTime']?.toString()),
-            unreadCount: conv['unreadCount'] as int? ?? 0,
-            lastMessageTime: _parseIsoTime(conv['lastMessageTime']?.toString()),
-          );
-        }).toList();
-
-        setState(() {
-          final existingChatsMap = {
-            for (var chat in _chats) chat.conversationId: chat
-          };
-
-          final mergedChats = <ChatPreview>[];
-
-          for (var newChat in newChats) {
-            final existingChat = existingChatsMap[newChat.conversationId];
-
-            if (existingChat != null) {
-              final existingTime = existingChat.lastMessageTime;
-              final newTime = newChat.lastMessageTime;
-
-              if (newTime != null &&
-                  (existingTime == null || newTime.isAfter(existingTime))) {
-                if (!silent) {
-                  debugPrint('║ ✅ Server message newer for ${newChat.name} - updating');
-                }
-                mergedChats.add(newChat.copyWith(
-                  unreadCount: newChat.unreadCount,
-                  isLocalUpdate: false,
-                ));
-                continue;
-              }
-
-              if (newTime != null &&
-                  existingTime != null &&
-                  newTime.isAtSameMomentAs(existingTime)) {
-                if (existingChat.isLocalUpdate) {
-                  if (!silent) {
-                    debugPrint('║ 🔄 Timestamps equal - keeping local update for ${newChat.name}');
-                  }
-                  mergedChats.add(existingChat.copyWith(
-                    unreadCount: newChat.unreadCount,
-                  ));
-                } else {
-                  if (!silent) {
-                    debugPrint('║ ✅ Timestamps equal - using server data for ${newChat.name}');
-                  }
-                  mergedChats.add(newChat.copyWith(
-                    unreadCount: newChat.unreadCount,
-                  ));
-                }
-                continue;
-              }
-
-              if (existingTime != null &&
-                  newTime != null &&
-                  existingTime.isAfter(newTime)) {
-                if (!silent) {
-                  debugPrint('║ 🔄 Local message newer for ${newChat.name} - keeping local');
-                }
-                mergedChats.add(existingChat.copyWith(
-                  unreadCount: newChat.unreadCount,
-                ));
-                continue;
-              }
-
-              if (!silent) {
-                debugPrint('║ ⚠️  No timestamp comparison - using server data for ${newChat.name}');
-              }
-              mergedChats.add(newChat.copyWith(
-                unreadCount: newChat.unreadCount,
-              ));
-            } else {
-              mergedChats.add(newChat);
+          // ⭐ KEEP existing chats in _activeConversations
+          debugPrint('║ ✅ API empty but KEEPING existing local chats (${_chats.length} chats)');
+          if (!silent) {
+            for (var chat in _chats) {
+              debugPrint('║   • ${chat.name}: ${chat.lastMessage}');
             }
           }
-
-          mergedChats.sort((a, b) {
-            final timeA = a.lastMessageTime;
-            final timeB = b.lastMessageTime;
-
-            if (timeA == null && timeB == null) return 0;
-            if (timeA == null) return 1;
-            if (timeB == null) return -1;
-
-            return timeB.compareTo(timeA);
-          });
-
-          _chats = mergedChats;
-          _hasInitialized = true;
-        });
+        }
 
         if (!silent) {
-          debugPrint('║ ✅ Loaded ${_chats.length} conversations from API');
-          for (var chat in _chats) {
-            debugPrint('║   • ${chat.name}: ${chat.lastMessage}');
+          debugPrint('╚═══════════════════════════════════════╝');
+        }
+        return;
+      }
+
+      final apiChats = conversations.map((conv) {
+        final otherUserId = conv['participants']?.firstWhere(
+              (p) => p != _currentUserId,
+          orElse: () => 'unknown',
+        );
+
+        final friend = _friends.firstWhere(
+              (f) => f.userId == otherUserId,
+          orElse: () => ChatPreview(
+            conversationId: conv['conversationId'] ?? '',
+            name: 'Unknown',
+            avatar: 'assets/images/default.png',
+            userId: otherUserId ?? 'unknown',
+          ),
+        );
+
+        // ✅ GET TYPE AND CONTENT
+        final messageType = conv['lastMessage']?['type']?.toString() ?? 'text';
+        final rawContent = conv['lastMessage']?['content']?.toString() ?? '';
+
+        // ✅ FORMAT MESSAGE BASED ON TYPE
+        String displayMessage;
+        if (messageType == 'image') {
+          displayMessage = '📷 Ảnh';
+        } else if (messageType == 'audio') {
+          displayMessage = '🎤 Tin nhắn thoại';
+        } else {
+          displayMessage = rawContent;
+        }
+
+        final timestamp = conv['lastMessage']?['createdAt'] ??
+            conv['lastMessage']?['timestamp'] ??
+            conv['lastMessage']?['created_at'];
+
+        DateTime? lastMsgTime;
+        if (timestamp != null) {
+          try {
+            lastMsgTime = DateTime.parse(timestamp.toString());
+          } catch (e) {
+            lastMsgTime = null;
           }
         }
+
+        return ChatPreview(
+          conversationId: conv['conversationId'] ?? '',
+          name: friend.name,
+          avatar: friend.avatar,
+          userId: friend.userId,
+          lastMessage: displayMessage,
+          time: lastMsgTime != null ? _formatTime(lastMsgTime) : '',
+          lastMessageTime: lastMsgTime,
+          unreadCount: conv['unreadCount'] ?? 0,
+        );
+      }).toList();
+
+      // Update chats with API data
+      if (mounted) {
+        setState(() {
+          _chats = apiChats;
+          _hasInitialized = true;
+        });
       }
 
       if (!silent) {
+        debugPrint('║ ✅ Loaded ${apiChats.length} chats from API');
         debugPrint('╚═══════════════════════════════════════╝');
       }
     } catch (e) {
-      if (!silent) {
-        debugPrint('║ ❌ Error loading from API: $e');
-      }
-
-      // ⭐ CHỈ INIT HARDCODED CHO TOMMY VÀ BELLA KHI CÓ LỖI
-      if (!_hasInitialized && _chats.isEmpty) {
-        if (_currentUserId == 'tommy' || _currentUserId == 'bella') {
-          debugPrint('║ 💡 First time init after error (Tommy/Bella) - using hardcoded data');
-          await _initChatsHardcoded();
-        } else {
-          debugPrint('║ 🚫 First time init after error (Other user) - starting empty');
-          setState(() {
-            _chats = [];
-            _hasInitialized = true;
-          });
-        }
-      } else {
-        debugPrint('║ ✅ API failed but keeping existing data (${_chats.length} chats)');
-      }
-
-      if (!silent) {
-        debugPrint('╚═══════════════════════════════════════╝');
-      }
+      debugPrint('❌ Error loading chats: $e');
     } finally {
-      if (!silent) {
+      if (!silent && mounted) {
         setState(() => _isLoading = false);
       }
     }
@@ -341,20 +308,29 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
     final conversationId = 'tommy-bella-chat';
 
-    final messages = await MessageApi.getMessages(
-      conversationId: conversationId,
-    );
+    // ⭐ Mark as active conversation
+    _activeConversations.add(conversationId);
+
+    final messages = await MessageApi.getMessages(conversationId: conversationId);
 
     String lastMsg = 'Say hi to start chatting!';
     DateTime lastMsgTime = now;
 
     if (messages.isNotEmpty) {
       final lastMessage = messages.last;
-      lastMsg = lastMessage['content']?.toString() ?? lastMsg;
 
-      final timestamp = lastMessage['createdAt'] ??
-          lastMessage['timestamp'] ??
-          lastMessage['created_at'];
+      // ✅ FORMAT MESSAGE BASED ON TYPE
+      final messageType = lastMessage['type']?.toString() ?? 'text';
+
+      if (messageType == 'image') {
+        lastMsg = '📷 Ảnh';
+      } else if (messageType == 'audio') {
+        lastMsg = '🎤 Tin nhắn thoại';
+      } else {
+        lastMsg = lastMessage['content']?.toString() ?? lastMsg;
+      }
+
+      final timestamp = lastMessage['createdAt'] ?? lastMessage['timestamp'] ?? lastMessage['created_at'];
       if (timestamp != null) {
         try {
           lastMsgTime = DateTime.parse(timestamp.toString());
@@ -404,16 +380,90 @@ class _ChatListScreenState extends State<ChatListScreen> {
     await _loadChatsFromApi();
   }
 
-  // ⭐ MỞ CHAT VỚI BẠN BÈ - KHÔNG TẠO PREVIEW
+  // ⭐⭐⭐ Open chat with friend - Only show chat if messages exist
   Future<void> _openChatWithFriend(ChatPreview friend) async {
-    debugPrint('═══════════════════════════════════════');
-    debugPrint('📱 Opening chat with friend: ${friend.name}');
-    debugPrint('   UserId: ${friend.userId}');
-    debugPrint('   🚫 NOT creating preview - will wait for first message');
-    debugPrint('═══════════════════════════════════════');
-
     final userIds = [_currentUserId, friend.userId]..sort();
     final conversationId = '${userIds[0]}-${userIds[1]}-chat';
+
+    debugPrint('═══════════════════════════════════════');
+    debugPrint('🆕 Opening chat with friend: ${friend.name}');
+    debugPrint('   ConversationId: $conversationId');
+    debugPrint('═══════════════════════════════════════');
+
+    // ✅ Check if chat already exists in list
+    final existingChatIndex = _chats.indexWhere((c) => c.conversationId == conversationId);
+
+    if (existingChatIndex == -1) {
+      debugPrint('║ 🔍 Chat not in list, checking for existing messages...');
+
+      try {
+        final messages = await MessageApi.getMessages(conversationId: conversationId);
+
+        if (messages.isNotEmpty) {
+          debugPrint('║ 📬 Found ${messages.length} existing messages!');
+
+          // Get last message info
+          final lastMessage = messages.last;
+          final messageType = lastMessage['type']?.toString() ?? 'text';
+
+          String displayMessage;
+          if (messageType == 'image') {
+            displayMessage = '📷 Ảnh';
+          } else if (messageType == 'audio') {
+            displayMessage = '🎤 Tin nhắn thoại';
+          } else {
+            displayMessage = lastMessage['content']?.toString() ?? '';
+          }
+
+          final timestamp = lastMessage['createdAt'] ??
+              lastMessage['timestamp'] ??
+              lastMessage['created_at'];
+
+          DateTime lastMsgTime = DateTime.now();
+          if (timestamp != null) {
+            try {
+              lastMsgTime = DateTime.parse(timestamp.toString());
+            } catch (e) {
+              lastMsgTime = DateTime.now();
+            }
+          }
+
+          // ✅ Create chat preview with existing messages
+          final newChat = ChatPreview(
+            conversationId: conversationId,
+            name: friend.name,
+            avatar: friend.avatar,
+            userId: friend.userId,
+            lastMessage: displayMessage,
+            time: _formatTime(lastMsgTime),
+            lastMessageTime: lastMsgTime,
+            isTyping: false,
+            unreadCount: 0,
+            isLocalUpdate: false,
+          );
+
+          setState(() {
+            _chats.insert(0, newChat);
+            _activeConversations.add(conversationId);
+          });
+
+          debugPrint('║ ✅ Chat added to list with existing messages!');
+          debugPrint('║ 💬 Last message: "$displayMessage"');
+        } else {
+          // ✅ NO existing messages - DON'T create preview yet
+          debugPrint('║ 📭 No existing messages found');
+          debugPrint('║ 🚫 NOT creating chat preview yet');
+          debugPrint('║ 💡 Chat preview will be created when user sends first message');
+        }
+      } catch (e) {
+        debugPrint('║ ⚠️ Error loading messages: $e');
+        debugPrint('║ 🚫 NOT creating chat preview (will wait for first message)');
+      }
+    } else {
+      debugPrint('║ ✅ Chat already exists in list at index $existingChatIndex');
+    }
+
+    debugPrint('═══════════════════════════════════════');
 
     setState(() => _isInChat = true);
 
@@ -426,57 +476,104 @@ class _ChatListScreenState extends State<ChatListScreen> {
           status: 'Online',
           conversationId: conversationId,
           currentUserId: _currentUserId,
-          onUpdateChatPreview: _updateChatPreview,
+          onUpdateChatPreview: (id, msg, {isTyping = false, DateTime? messageTime}) {
+            if (!isTyping && msg.isNotEmpty) {
+              _updateChatPreview(id, msg, messageTime: messageTime);
+            }
+          },
         ),
       ),
     );
 
     setState(() => _isInChat = false);
 
-    // ⭐ Sau khi đóng chat, refresh để lấy tin nhắn mới từ server
+    // Refresh to sync with server
     await _loadChatsFromApi(silent: true);
   }
 
-  // ⭐ UPDATE CHAT PREVIEW - CHỈ TẠO KHI CÓ TIN NHẮN
-  void _updateChatPreview(String conversationId, String lastMessage, {bool isTyping = false}) {
-    final now = DateTime.now();
+  void _updateChatPreview(String conversationId, String lastMessage, {bool isTyping = false, DateTime? messageTime}) {
+    if (conversationId.isEmpty) return;
+
+    // ✅ Format message if it's an image/audio URL
+    String displayMessage = lastMessage;
+    if (lastMessage.startsWith('http') && (lastMessage.contains('.jpg') ||
+        lastMessage.contains('.jpeg') || lastMessage.contains('.png') ||
+        lastMessage.contains('.gif') || lastMessage.contains('.webp') ||
+        lastMessage.contains('cloudinary') || lastMessage.contains('imgur'))) {
+      displayMessage = '📷 Ảnh';
+    } else if (lastMessage.startsWith('http') && (lastMessage.contains('.mp3') ||
+        lastMessage.contains('.wav') || lastMessage.contains('.m4a') ||
+        lastMessage.contains('.ogg') || lastMessage.contains('audio'))) {
+      displayMessage = '🎤 Tin nhắn thoại';
+    }
+
+    // ✅ Use provided messageTime or current time
+    final now = messageTime ?? DateTime.now();
 
     debugPrint('╔═══════════════════════════════════════╗');
-    debugPrint('║ 📝 UPDATE CHAT PREVIEW                ║');
+    debugPrint('║ 🔄 UPDATE CHAT PREVIEW                ║');
     debugPrint('╠═══════════════════════════════════════╣');
     debugPrint('║ ConversationId: $conversationId');
-    debugPrint('║ New Message: $lastMessage');
-    debugPrint('║ Is Typing: $isTyping');
-    debugPrint('║ Current chats: ${_chats.length}');
+    debugPrint('║ Original Message: "$lastMessage"');
+    debugPrint('║ Display Message: "$displayMessage"');
+    debugPrint('║ IsTyping: $isTyping');
+    debugPrint('║ Message Time: ${_formatTime(now)}');
 
     setState(() {
       final chatIndex = _chats.indexWhere((c) => c.conversationId == conversationId);
 
       if (chatIndex != -1) {
-        // ⭐ Chat đã tồn tại - chỉ update
-        _chats[chatIndex] = _chats[chatIndex].copyWith(
-          lastMessage: lastMessage,
-          time: _formatTime(now),
-          lastMessageTime: now,
-          isTyping: isTyping,
-          unreadCount: isTyping ? _chats[chatIndex].unreadCount : 0,
-          isLocalUpdate: true,
-        );
+        // ✅ Chat already exists - just update content
+        debugPrint('║ ✅ Chat EXISTS in list at index $chatIndex');
 
-        final updatedChat = _chats.removeAt(chatIndex);
-        _chats.insert(0, updatedChat);
-
-        debugPrint('║ ✅ Chat updated: ${updatedChat.name}');
-      } else {
-        // ⭐ Chat chưa tồn tại - CHỈ TẠO KHI CÓ TIN NHẮN (không phải typing)
         if (!isTyping && lastMessage.isNotEmpty) {
-          debugPrint('║ 💬 First message sent - creating new chat preview');
+          // New message - update and move to top
+          _chats[chatIndex] = _chats[chatIndex].copyWith(
+            lastMessage: displayMessage,
+            lastMessageTime: now,
+            time: _formatTime(now),
+            isTyping: false,
+            isLocalUpdate: true,
+          );
 
+          final updatedChat = _chats.removeAt(chatIndex);
+          _chats.insert(0, updatedChat);
+          debugPrint('║ ✅ Chat updated and moved to top: ${updatedChat.name}');
+        } else if (isTyping) {
+          // Just update typing status
+          _chats[chatIndex] = _chats[chatIndex].copyWith(isTyping: true);
+          debugPrint('║ 💬 Chat updated with typing status: ${_chats[chatIndex].name}');
+        }
+      } else {
+        // 🆕 Chat doesn't exist yet - consider creating new
+        debugPrint('║ 🆕 Chat NOT in list yet');
+
+        // ⭐⭐⭐ CONDITIONS TO CREATE NEW CHAT PREVIEW:
+        // ✅ 1. NOT a typing event (isTyping = false)
+        // ✅ 2. HAS message content (lastMessage not empty)
+        // ✅ 3. NEW message SENT in current session
+        final shouldCreatePreview = !isTyping && lastMessage.isNotEmpty;
+
+        debugPrint('║ 🤔 Should create preview? $shouldCreatePreview');
+        debugPrint('║    - isTyping: $isTyping (must be false)');
+        debugPrint('║    - hasMessage: ${lastMessage.isNotEmpty} (must be true)');
+
+        if (shouldCreatePreview) {
+          debugPrint('║ ✅ CREATING NEW CHAT PREVIEW!');
+          debugPrint('║ 💬 NEW message detected in current session!');
+          debugPrint('║ 🎯 Adding to chat list now...');
+
+          // ⭐ Mark conversation as active
+          _activeConversations.add(conversationId);
+          debugPrint('║ 📌 Marked as active conversation');
+
+          // Extract userId from conversationId
           final parts = conversationId.split('-');
           String? otherUserId;
 
           if (parts.length >= 2) {
             otherUserId = parts[0] == _currentUserId ? parts[1] : parts[0];
+            debugPrint('║    - Other userId: $otherUserId');
           }
 
           if (otherUserId != null) {
@@ -484,18 +581,21 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   (f) => f.userId == otherUserId,
               orElse: () => ChatPreview(
                 conversationId: conversationId,
-                name: 'Unknown',
+                name: 'Unknown User',
                 avatar: 'assets/images/default.png',
                 userId: otherUserId!,
               ),
             );
+
+            debugPrint('║    - Friend name: ${friend.name}');
+            debugPrint('║    - Friend avatar: ${friend.avatar}');
 
             final newChat = ChatPreview(
               conversationId: conversationId,
               name: friend.name,
               avatar: friend.avatar,
               userId: friend.userId,
-              lastMessage: lastMessage,
+              lastMessage: displayMessage,
               time: _formatTime(now),
               lastMessageTime: now,
               isTyping: false,
@@ -504,20 +604,33 @@ class _ChatListScreenState extends State<ChatListScreen> {
             );
 
             _chats.insert(0, newChat);
-            debugPrint('║ ✅ Created new chat: ${newChat.name}');
+
+            debugPrint('║ ✅ NEW CHAT CREATED!');
+            debugPrint('║ 👤 Name: ${newChat.name}');
+            debugPrint('║ 💬 First NEW message: "$displayMessage"');
+            debugPrint('║ 🕐 Time: ${newChat.time}');
+            debugPrint('║ 🎉 Chat is now visible in main list!');
+            debugPrint('║ 📊 Total chats: ${_chats.length}');
+            debugPrint('║ 📊 Total active conversations: ${_activeConversations.length}');
           } else {
-            debugPrint('║ ❌ Could not extract userId from conversationId');
+            debugPrint('║ ❌ Failed to extract userId from conversationId');
           }
         } else {
-          debugPrint('║ 🚫 Typing indicator or empty message - NOT creating preview yet');
+          debugPrint('║ 🚫 NOT CREATING CHAT PREVIEW');
+          if (isTyping) {
+            debugPrint('║    ❌ Reason: This is just a typing indicator');
+            debugPrint('║    💡 Typing indicators don\'t create new chats');
+          } else if (lastMessage.isEmpty) {
+            debugPrint('║    ❌ Reason: Message is empty');
+            debugPrint('║    💡 This means user just opened chat to view');
+            debugPrint('║    💡 Old messages do NOT trigger preview creation');
+          }
+          debugPrint('║    ⏳ Waiting for NEW message to be sent...');
         }
       }
-
-      debugPrint('║ Total chats after update: ${_chats.length}');
     });
 
-    debugPrint('╚═══════════════════════════════════════╝');
-
+    // Reset local update flag after 10 seconds
     Future.delayed(const Duration(seconds: 10), () {
       if (mounted) {
         setState(() {
@@ -529,46 +642,42 @@ class _ChatListScreenState extends State<ChatListScreen> {
         });
       }
     });
-  }
 
-  DateTime? _parseIsoTime(String? isoString) {
-    if (isoString == null || isoString.isEmpty) return null;
-    try {
-      return DateTime.parse(isoString);
-    } catch (e) {
-      return null;
-    }
+    debugPrint('╚═══════════════════════════════════════╝');
   }
 
   String _formatTime(DateTime dateTime) {
-    final hour = dateTime.hour;
-    final minute = dateTime.minute.toString().padLeft(2, '0');
-    final period = hour >= 12 ? 'PM' : 'AM';
-    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-    return '$displayHour:$minute $period';
-  }
+    // ✅ Convert to local timezone first
+    final localDateTime = dateTime.toLocal();
 
-  String _formatTimeFromString(String? isoString) {
-    if (isoString == null || isoString.isEmpty) return '';
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final messageDate = DateTime(localDateTime.year, localDateTime.month, localDateTime.day);
 
-    try {
-      final dateTime = DateTime.parse(isoString);
-      final now = DateTime.now();
-      final difference = now.difference(dateTime);
-
-      if (difference.inDays == 0) {
-        return _formatTime(dateTime);
-      } else if (difference.inDays == 1) {
-        return 'Yesterday';
-      } else if (difference.inDays < 7) {
-        final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        return weekdays[dateTime.weekday - 1];
-      } else {
-        return '${dateTime.day}/${dateTime.month}';
-      }
-    } catch (e) {
-      return '';
+    // If message is from today, show time only
+    if (messageDate == today) {
+      final hour = localDateTime.hour;
+      final minute = localDateTime.minute.toString().padLeft(2, '0');
+      final period = hour >= 12 ? 'PM' : 'AM';
+      final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+      return '$displayHour:$minute $period';
     }
+
+    // If message is from yesterday
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (messageDate == yesterday) {
+      return 'Yesterday';
+    }
+
+    // If message is from this week (within 7 days)
+    final daysAgo = today.difference(messageDate).inDays;
+    if (daysAgo < 7) {
+      const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      return weekDays[messageDate.weekday - 1];
+    }
+
+    // Otherwise show date
+    return '${localDateTime.day}/${localDateTime.month}/${localDateTime.year}';
   }
 
   void _showDeleteChatDialog(ChatPreview chat) {
@@ -634,21 +743,24 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final deletedChat = chat;
     final deletedIndex = _chats.indexOf(chat);
 
+    // ⭐ Remove from active conversations
+    _activeConversations.remove(chat.conversationId);
+
     setState(() {
       _chats.removeWhere((c) => c.conversationId == chat.conversationId);
     });
 
     debugPrint('🗑️ Deleting chat with ${chat.name}');
     debugPrint('   ConversationId: ${chat.conversationId}');
+    debugPrint('   Removed from active conversations');
 
     try {
-      debugPrint('⚠️ Trying to delete messages instead of conversation');
       final success = await MessageApi.deleteAllMessages(chat.conversationId);
 
       if (success) {
         debugPrint('✅ Messages deleted from database');
       } else {
-        debugPrint('⚠️ Could not delete messages from database (endpoint may not exist)');
+        debugPrint('⚠️ Could not delete messages from database');
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -658,6 +770,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
           action: SnackBarAction(
             label: 'Undo',
             onPressed: () {
+              // ⭐ Restore to active conversations
+              _activeConversations.add(deletedChat.conversationId);
+
               setState(() {
                 _chats.insert(deletedIndex, deletedChat);
               });
@@ -683,6 +798,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ),
       );
 
+      // Restore on error
+      _activeConversations.add(deletedChat.conversationId);
       setState(() {
         _chats.insert(deletedIndex, deletedChat);
       });
@@ -690,12 +807,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Future<void> _blockUser(ChatPreview chat) async {
+    // ⭐ Remove from active conversations
+    _activeConversations.remove(chat.conversationId);
+
     setState(() {
       _chats.removeWhere((c) => c.conversationId == chat.conversationId);
     });
 
     debugPrint('🚫 Blocking user: ${chat.name}');
     debugPrint('   UserId: ${chat.userId}');
+    debugPrint('   Removed from active conversations');
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -711,26 +832,26 @@ class _ChatListScreenState extends State<ChatListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
         backgroundColor: Colors.grey[100],
-        elevation: 0,
-        title: const Text(
-          'Messages',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 34,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        actions: [
-          IconButton(
+        appBar: AppBar(
+            automaticallyImplyLeading: false,
+            backgroundColor: Colors.grey[100],
+            elevation: 0,
+            title: const Text(
+              'Messages',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 34,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            actions: [
+            IconButton(
             icon: const Icon(Icons.edit_square, color: Colors.blue),
-            onPressed: _showNewChatDialog,
-          ),
-        ],
-      ),
+              onPressed: _showNewChatDialog,
+            ),
+            ],
+        ),
       body: Column(
         children: [
           Padding(
@@ -825,10 +946,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final displayChats = _filteredChats;
 
     if (displayChats.isEmpty && _searchQuery.isNotEmpty) {
-      final matchingFriends = _friends.where((f) =>
-      f.name.toLowerCase().contains(_searchQuery.toLowerCase()) &&
-          f.name != 'You'
-      ).toList();
+      final matchingFriends = _friends
+          .where((f) => f.name.toLowerCase().contains(_searchQuery.toLowerCase()) && f.name != 'You')
+          .toList();
 
       if (matchingFriends.isNotEmpty) {
         return ListView.builder(
@@ -882,7 +1002,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 'Start a conversation with your friends!',
                 style: TextStyle(fontSize: 14, color: Colors.grey[500]),
               ),
-            const SizedBox(height: 16),
+            if (_searchQuery.isEmpty)
+              const SizedBox(height: 16),
             if (_searchQuery.isEmpty)
               TextButton.icon(
                 onPressed: _refreshChats,

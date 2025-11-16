@@ -102,6 +102,37 @@ services:
       retries: 3
 
   # ========================================
+  # CHAT SERVICE (Spring Boot)
+  # ========================================
+  chatservice:
+    build:
+      context: ./backend/chat-service
+      dockerfile: Dockerfile
+    container_name: chatservice
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-chat:5432/chatdb
+      SPRING_DATASOURCE_USERNAME: chat
+      SPRING_DATASOURCE_PASSWORD: secret
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_APPLICATION_NAME: ChatService
+      SERVER_PORT: 8081
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - mocha-network
+    restart: on-failure
+
+  # ========================================
   # AUTH & USER SERVICES
   # ========================================
   db:
@@ -165,36 +196,6 @@ services:
     restart: on-failure
 
   # ========================================
-  # CHAT SERVICE (Node.js)
-  # Thêm service này nếu bạn có ChatService
-  # ========================================
-  # chatservice:
-  #   build:
-  #     context: ./backend/ChatService
-  #     dockerfile: Dockerfile
-  #   container_name: chatservice
-  #   ports:
-  #     - "8084:8084"
-  #   environment:
-  #     - NODE_ENV=production
-  #     - DATABASE_URL=postgresql://chat:secret@postgres:5432/chatdb
-  #     - REDIS_URL=redis://redis:6379
-  #     - KAFKA_BROKERS=kafka:29092
-  #     - MINIO_ENDPOINT=minio:9000
-  #     - MINIO_ACCESS_KEY=minioadmin
-  #     - MINIO_SECRET_KEY=minioadmin
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     kafka:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #   networks:
-  #     - mocha-network
-  #   restart: on-failure
-
-  # ========================================
   # API GATEWAY
   # ========================================
   apigateway:
@@ -207,7 +208,6 @@ services:
     depends_on:
       - authservice
       - userservice
-      # - chatservice  # Uncomment nếu có ChatService
     networks:
       - mocha-network
     restart: on-failure
@@ -221,12 +221,9 @@ networks:
     driver: bridge
 
 volumes:
-  # Chat infrastructure volumes
   pgdata:
   minio-data:
   kafka-data:
   zookeeper-data:
   zookeeper-log:
-
-  # Auth/User volumes
   mysql-data:

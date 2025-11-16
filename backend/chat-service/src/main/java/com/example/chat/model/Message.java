@@ -30,13 +30,29 @@ public class Message {
     private String content;
 
     @Column(name = "type")
-    private String type; // text, image, voice, sticker
+    private String type;
 
     @Column(name = "attachment_url")
     private String attachmentUrl;
 
+    @Column(name = "status")
+    private String status;
+
+    // getter
+    public String getStatus() { return status; }
+
+    // setter
+    public void setStatus(String status) { this.status = status; }
+
     @Column(name = "created_at")
     private Instant createdAt;
+
+    // ✅ ĐỔI SANG Boolean (wrapper class)
+    @Column(name = "recalled")
+    private Boolean recalled;
+
+    @Column(name = "recalled_at")
+    private Instant recalledAt;
 
     public Message() {}
 
@@ -44,9 +60,11 @@ public class Message {
     public void prePersist() {
         if (id == null) id = UUID.randomUUID().toString();
         if (createdAt == null) createdAt = Instant.now();
+        // ✅ Set default cho recalled nếu null
+        if (recalled == null) recalled = false;
     }
 
-    // Getters & Setters
+    // GETTER/SETTER
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
 
@@ -70,4 +88,26 @@ public class Message {
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+
+    // ✅ Getter trả về Boolean
+    public Boolean getRecalled() {
+        return recalled;
+    }
+
+    public void setRecalled(Boolean recalled) {
+        this.recalled = recalled;
+    }
+
+    // ✅ Helper method để check (tránh NullPointerException)
+    public boolean isRecalled() {
+        return Boolean.TRUE.equals(recalled);
+    }
+
+    public Instant getRecalledAt() {
+        return recalledAt;
+    }
+
+    public void setRecalledAt(Instant recalledAt) {
+        this.recalledAt = recalledAt;
+    }
 }
