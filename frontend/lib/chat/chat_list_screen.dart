@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'chat_detail_screen.dart';
 import 'package:frontend/chat/message_api.dart';
