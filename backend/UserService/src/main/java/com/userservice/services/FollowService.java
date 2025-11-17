@@ -4,17 +4,14 @@ import com.userservice.models.User;
 import com.userservice.models.Friend;
 import com.userservice.repositories.UserRepository;
 import com.userservice.repositories.FriendRepository;
+import com.userservice.dtos.FriendInfoDto;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -103,22 +100,6 @@ public class FollowService {
     }
 
     /**
-     * Unfriend trực tiếp (không liên quan follow)
-     */
-    @Transactional
-    public void unfriend(String currentUserFirebaseUid, Long targetUserId) {
-
-        User currentUser = userRepository.findByFirebaseUid(currentUserFirebaseUid)
-                .orElseThrow(() -> new RuntimeException("Current user not found"));
-
-        Friend friendship = friendRepository.findByUsers(currentUser.getId(), targetUserId)
-                .orElseThrow(() -> new RuntimeException("Not friends"));
-
-        friendRepository.delete(friendship);
-        log.info("Friendship removed between {} and {}", currentUser.getId(), targetUserId);
-    }
-
-    /**
      * Kiểm tra đang follow
      */
     public boolean isFollowing(String currentUserFirebaseUid, Long targetUserId) {
@@ -166,5 +147,24 @@ public class FollowService {
         stats.put("following", (long) currentUser.getFollowing().size());
         stats.put("friends", friendRepository.countFriendsByUserId(currentUser.getId()));
         return stats;
+    }
+
+    public List<FriendInfoDto> getFriendList(String currentUserFirebaseUid) {
+
+        User currentUser = userRepository.findByFirebaseUid(currentUserFirebaseUid)
+                .orElseThrow(() -> new RuntimeException("Current user not found"));
+
+        List<Friend> friendships = friendRepository.findAllByUserId(currentUser.getId());
+
+        return friendships.stream()
+                .map(f -> f.getOtherUser(currentUser.getId())) // lấy người bạn còn lại
+                .filter(Objects::nonNull)
+                .map(user -> new FriendInfoDto(
+                        user.getFirebaseUid(),
+                        user.getFullName(),
+                        user.getPhotoUrl(),
+                        user.getEmail()
+                ))
+                .toList();
     }
 }
