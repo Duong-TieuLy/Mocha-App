@@ -1,8 +1,8 @@
 import 'dart:convert';
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../models/auth_model.dart';
 
@@ -10,6 +10,8 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final _storage = const FlutterSecureStorage();
   final String baseUrl = 'http://10.0.2.2:8000/api/auth';
+  final String notificationBaseUrl = 'http://10.0.2.2:8085/api/notification';
+  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
 
   Future<AuthModel> login(String email, String password) async {
     final userCredential = await _auth.signInWithEmailAndPassword(email: email, password: password);
@@ -19,9 +21,18 @@ class AuthService {
     final idToken = await user.getIdToken();
     if (idToken!.isEmpty) throw Exception("ID token empty");
 
+    // Verify token với backend
     final authUser = await _verifyToken(idToken);
 
+    // Lưu auth token + uid
     await _saveAuth(idToken, user.uid);
+
+    // Lấy FCM token của thiết bị
+    final fcmToken = await _messaging.getToken();
+    if (fcmToken != null) {
+      // Gửi FCM token lên backend
+      await _saveFcmToken(user.uid, fcmToken);
+    }
 
     return authUser;
   }
@@ -35,7 +46,6 @@ class AuthService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data == null) throw Exception("Backend returned null");
       return AuthModel.fromJson(data);
     } else {
       throw Exception('AuthService error: ${response.body}');
@@ -45,6 +55,21 @@ class AuthService {
   Future<void> _saveAuth(String token, String uid) async {
     await _storage.write(key: 'idToken', value: token);
     await _storage.write(key: 'uid', value: uid);
+  }
+
+  Future<void> _saveFcmToken(String uid, String fcmToken) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$notificationBaseUrl/save-token'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'firebaseUid': uid, 'fcmToken': fcmToken}),
+      );
+      if (response.statusCode != 200) {
+        print('FCM token not saved: ${response.body}');
+      }
+    } catch (e) {
+      print('Error saving FCM token: $e');
+    }
   }
 
   Future<String?> getToken({bool forceRefresh = false}) async {

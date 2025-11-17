@@ -897,7 +897,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     _messageController.selection = TextSelection.fromPosition(
                         TextPosition(offset: _messageController.text.length));
                   },
-                  config: const Config(columns: 7, emojiSizeMax: 32),
+                  config: Config(
+                    height: 250,
+                    emojiViewConfig: const EmojiViewConfig(
+                      columns: 7,
+                      emojiSizeMax: 32,
+                    ),
+                    categoryViewConfig: const CategoryViewConfig(),
+                    bottomActionBarConfig: const BottomActionBarConfig(),
+                  ),
                 ),
               ),
             ),
