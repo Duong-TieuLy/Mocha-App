@@ -70,7 +70,6 @@ class UserService {
     final response = await http.put(
       Uri.parse('$baseUrl/api/users/me'),
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
         'X-User-Id': uid,
       },

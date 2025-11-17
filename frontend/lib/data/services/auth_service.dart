@@ -36,6 +36,55 @@ class AuthService {
 
     return authUser;
   }
+  // ================= SIGNUP =================
+  Future<AuthModel> signup({
+    required String email,
+    required String password,
+    required String confirmPassword,
+    required String displayName,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse("$baseUrl/signup"),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+          'confirmPassword': confirmPassword,
+          'displayName': displayName,
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Signup failed: ${response.body}');
+      }
+
+      final data = jsonDecode(response.body);
+
+      // Backend phải trả về:
+      // {
+      //   "uid": "...",
+      //   "email": "...",
+      //   "displayName": "...",
+      //   "token": "JWT/Firebase Custom Token"
+      // }
+
+      final authUser = AuthModel.fromJson(data);
+
+      // 🔹 Lưu token & UID từ backend
+      await _saveAuth(data["token"], data["uid"]);
+
+      // 🔹 Lấy FCM token và gửi về backend
+      final fcmToken = await _messaging.getToken();
+      if (fcmToken != null) {
+        await _saveFcmToken(data["uid"], fcmToken);
+      }
+
+      return authUser;
+    } catch (e) {
+      rethrow;
+    }
+  }
 
   Future<AuthModel> _verifyToken(String idToken) async {
     final response = await http.post(

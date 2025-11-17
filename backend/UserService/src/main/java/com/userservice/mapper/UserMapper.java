@@ -11,8 +11,6 @@ public class UserMapper {
         if (user == null) return null;
 
         UserProfileDto dto = new UserProfileDto();
-        dto.setId(user.getId());
-        dto.setFirebaseUid(user.getFirebaseUid());
         dto.setFullName(user.getFullName());
         dto.setUsername(user.getUsername());
         dto.setEmail(user.getEmail());

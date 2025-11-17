@@ -3,15 +3,15 @@ import '../models/post_model.dart';
 import '../services/post_service.dart';
 
 class PostRepository {
-  final PostService service;
+  final PostService postService;
 
-  PostRepository({required this.service});
+  PostRepository({required this.postService});
 
   Future<List<Post>> getPosts(String uid) async {
-    return await service.fetchPosts(uid);
+    return await postService.fetchPosts(uid);
   }
 
   Future<Post> addPost(Post post) async {
-    return await service.createPost(post);
+    return await postService.createPost(post);
   }
 }
