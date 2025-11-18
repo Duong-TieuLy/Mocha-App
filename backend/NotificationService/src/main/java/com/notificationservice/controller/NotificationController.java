@@ -1,23 +1,24 @@
 package com.notificationservice.controller;
 
+import com.notificationservice.dtos.FriendsNotificationRequest;
+import com.notificationservice.dtos.SingleNotificationRequest;
 import com.notificationservice.service.NotificationService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/notification")
+@RequiredArgsConstructor
 public class NotificationController {
 
-    @Autowired
-    private NotificationService notificationService;
+    private final NotificationService notificationService;
 
-    /**
-     * Lưu FCM token — Frontend gọi khi login hoặc khi refresh token
-     */
+    // ================================
+    // 1️⃣ Lưu FCM token
+    // ================================
     @PostMapping("/save-token")
     public ResponseEntity<?> saveToken(@RequestBody Map<String, String> request) {
 
@@ -31,26 +32,17 @@ public class NotificationController {
         return ResponseEntity.ok(notificationService.saveToken(firebaseUid, fcmToken));
     }
 
-    /**
-     * Gửi notification — backend sử dụng
-     */
+    // ================================
+    // 2️⃣ Gửi notification single user
+    // ================================
     @PostMapping("/send")
-    public ResponseEntity<?> sendNotification(@RequestBody Map<String, Object> request) {
-
+    public ResponseEntity<?> sendNotification(@RequestBody SingleNotificationRequest req) {
         try {
-            String firebaseUid = (String) request.get("firebaseUid");
-            String title = (String) request.get("title");
-            String body = (String) request.get("body");
-
-            @SuppressWarnings("unchecked")
-            Map<String, String> data = (Map<String, String>) request.get("data");
-
-            if (firebaseUid == null) {
+            if (req.getFirebaseUid() == null) {
                 return ResponseEntity.badRequest().body("firebaseUid bị thiếu");
             }
 
-            notificationService.sendNotificationToFirebaseUid(firebaseUid, title, body, data);
-
+            notificationService.sendNotification(req);
             return ResponseEntity.ok("Notification sent");
 
         } catch (Exception e) {
@@ -58,24 +50,17 @@ public class NotificationController {
         }
     }
 
+    // ================================
+    // 3️⃣ Gửi notification tới bạn bè
+    // ================================
     @PostMapping("/send-to-friends")
-    public ResponseEntity<?> sendToFriends(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> sendToFriends(@RequestBody FriendsNotificationRequest req) {
         try {
-            @SuppressWarnings("unchecked")
-            List<String> firebaseUids = (List<String>) request.get("firebaseUids");
-
-            String title = (String) request.get("title");
-            String body = (String) request.get("body");
-
-            @SuppressWarnings("unchecked")
-            Map<String, String> data = (Map<String, String>) request.get("data");
-
-            if (firebaseUids == null || firebaseUids.isEmpty()) {
+            if (req.getFirebaseUids() == null || req.getFirebaseUids().isEmpty()) {
                 return ResponseEntity.badRequest().body("Danh sách firebaseUids bị trống");
             }
 
-            notificationService.sendNotificationToMultiple(firebaseUids, title, body, data);
-
+            notificationService.sendToFriends(req);
             return ResponseEntity.ok("Notification sent to friends");
 
         } catch (Exception e) {

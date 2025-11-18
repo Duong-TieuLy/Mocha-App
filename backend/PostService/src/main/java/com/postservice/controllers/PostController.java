@@ -49,8 +49,12 @@ public class PostController {
         post.setContent(postRequest.getContent());
         post.setImages(postRequest.getImages());
         post.setCreatedAt(Instant.now());
-        return ResponseEntity.ok(postService.createPost(post));
+
+        Post savedPost = postService.createPost(post);
+
+        return ResponseEntity.ok(savedPost);
     }
+
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deletePost(@PathVariable Long id) {

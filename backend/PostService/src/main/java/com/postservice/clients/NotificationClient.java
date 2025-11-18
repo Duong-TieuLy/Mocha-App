@@ -14,10 +14,10 @@ public class NotificationClient {
     private final RestTemplate restTemplate;
 
     private static final String SINGLE_NOTIFICATION_URL =
-            "http://notificationservice:8084/api/notification/send";
+            "http://notificationservice:8085/api/notification/send";
 
     private static final String FRIENDS_NOTIFICATION_URL =
-            "http://notificationservice:8084/api/notification/send-to-friends";
+            "http://notificationservice:8085/api/notification/send-to-friends";
 
     public void sendNotification(String firebaseUid,
                                  String title,

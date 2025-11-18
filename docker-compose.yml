@@ -231,18 +231,19 @@ services:
     ports:
       - "8085:8085"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/NotificationDB
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=YourStrong@Password123
-      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
-      - SPRING_JPA_SHOW_SQL=true
-      - SERVER_PORT=8085
-      - SPRING_APPLICATION_NAME=PostService
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/NotificationDB
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: YourStrong@Password123
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+      SPRING_APPLICATION_NAME: NotificationService
+      SERVER_PORT: 8085
     depends_on:
       - db
     networks:
       - mocha-network
     restart: on-failure
+
 
   # ========================================
   # API GATEWAY

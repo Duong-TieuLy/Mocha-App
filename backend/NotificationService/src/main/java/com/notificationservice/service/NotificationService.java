@@ -1,6 +1,8 @@
 package com.notificationservice.service;
 
 import com.google.firebase.messaging.*;
+import com.notificationservice.dtos.FriendsNotificationRequest;
+import com.notificationservice.dtos.SingleNotificationRequest;
 import com.notificationservice.model.UserToken;
 import com.notificationservice.repository.UserTokenRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,16 +18,15 @@ public class NotificationService {
     @Autowired
     private UserTokenRepository userTokenRepository;
 
-    /**
-     * Lưu token — mỗi user có thể có nhiều token
-     */
+    // ================================
+    // 1️⃣ Lưu token
+    // ================================
     public UserToken saveToken(String firebaseUid, String fcmToken) {
 
         if (firebaseUid == null || fcmToken == null || fcmToken.isBlank()) {
             throw new RuntimeException("firebaseUid hoặc fcmToken null");
         }
 
-        // Nếu token đã tồn tại → cập nhật firebaseUid + updatedAt
         UserToken token = userTokenRepository.findByFcmToken(fcmToken)
                 .orElseGet(UserToken::new);
 
@@ -36,9 +37,33 @@ public class NotificationService {
         return userTokenRepository.save(token);
     }
 
-    /**
-     * Gửi notification tới tất cả thiết bị của user
-     */
+    // ================================
+    // 2️⃣ Gửi từ DTO (single)
+    // ================================
+    public void sendNotification(SingleNotificationRequest req) {
+        sendNotificationToFirebaseUid(
+                req.getFirebaseUid(),
+                req.getTitle(),
+                req.getBody(),
+                req.getData()
+        );
+    }
+
+    // ================================
+    // 3️⃣ Gửi từ DTO (friends)
+    // ================================
+    public void sendToFriends(FriendsNotificationRequest req) {
+        sendNotificationToMultiple(
+                req.getFirebaseUids(),
+                req.getTitle(),
+                req.getBody(),
+                req.getData()
+        );
+    }
+
+    // ================================
+    // 4️⃣ Logic gửi notification
+    // ================================
     public void sendNotificationToFirebaseUid(
             String firebaseUid,
             String title,
@@ -56,27 +81,27 @@ public class NotificationService {
             Message.Builder builder = Message.builder()
                     .setToken(token.getFcmToken());
 
-            // Notification popup
             if (title != null || body != null) {
                 builder.setNotification(
                         Notification.builder()
                                 .setTitle(title)
                                 .setBody(body)
-                                .build());
+                                .build()
+                );
             }
 
-            // Data
             if (data != null && !data.isEmpty()) {
                 builder.putAllData(data);
             }
 
             try {
                 FirebaseMessaging.getInstance().send(builder.build());
+
             } catch (FirebaseMessagingException e) {
 
                 String error = String.valueOf(e.getErrorCode());
 
-                // Token chết → xóa
+                // Token không hợp lệ → xóa
                 if ("registration-token-not-registered".equals(error) ||
                         "invalid-argument".equals(error)) {
 
@@ -88,11 +113,15 @@ public class NotificationService {
         }
     }
 
+    // ================================
+    // 5️⃣ Gửi tới nhiều user
+    // ================================
     public void sendNotificationToMultiple(
             List<String> firebaseUids,
             String title,
             String body,
             Map<String, String> data) {
+
         for (String uid : firebaseUids) {
             try {
                 sendNotificationToFirebaseUid(uid, title, body, data);

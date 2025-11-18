@@ -15,7 +15,7 @@ public class UserClient {
 
     private final RestTemplate restTemplate;
 
-    private final String USER_SERVICE_URL = "http://userservice:8082/api/users/follow/friends";
+    private final String USER_SERVICE_URL = "http://userservice:8082/api/users/follow/followers";
 
     public List<String> getFriendFirebaseUids(String firebaseUid) {
 
