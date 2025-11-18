@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -13,7 +14,6 @@ public class NotificationController {
 
     @Autowired
     private NotificationService notificationService;
-
 
     /**
      * Lưu FCM token — Frontend gọi khi login hoặc khi refresh token
@@ -30,7 +30,6 @@ public class NotificationController {
 
         return ResponseEntity.ok(notificationService.saveToken(firebaseUid, fcmToken));
     }
-
 
     /**
      * Gửi notification — backend sử dụng
@@ -53,6 +52,31 @@ public class NotificationController {
             notificationService.sendNotificationToFirebaseUid(firebaseUid, title, body, data);
 
             return ResponseEntity.ok("Notification sent");
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Lỗi gửi thông báo: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/send-to-friends")
+    public ResponseEntity<?> sendToFriends(@RequestBody Map<String, Object> request) {
+        try {
+            @SuppressWarnings("unchecked")
+            List<String> firebaseUids = (List<String>) request.get("firebaseUids");
+
+            String title = (String) request.get("title");
+            String body = (String) request.get("body");
+
+            @SuppressWarnings("unchecked")
+            Map<String, String> data = (Map<String, String>) request.get("data");
+
+            if (firebaseUids == null || firebaseUids.isEmpty()) {
+                return ResponseEntity.badRequest().body("Danh sách firebaseUids bị trống");
+            }
+
+            notificationService.sendNotificationToMultiple(firebaseUids, title, body, data);
+
+            return ResponseEntity.ok("Notification sent to friends");
 
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Lỗi gửi thông báo: " + e.getMessage());

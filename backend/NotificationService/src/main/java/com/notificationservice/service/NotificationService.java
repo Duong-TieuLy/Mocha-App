@@ -16,7 +16,6 @@ public class NotificationService {
     @Autowired
     private UserTokenRepository userTokenRepository;
 
-
     /**
      * Lưu token — mỗi user có thể có nhiều token
      */
@@ -37,7 +36,6 @@ public class NotificationService {
         return userTokenRepository.save(token);
     }
 
-
     /**
      * Gửi notification tới tất cả thiết bị của user
      */
@@ -45,8 +43,7 @@ public class NotificationService {
             String firebaseUid,
             String title,
             String body,
-            Map<String, String> data
-    ) {
+            Map<String, String> data) {
 
         List<UserToken> tokens = userTokenRepository.findAllByFirebaseUid(firebaseUid);
 
@@ -65,8 +62,7 @@ public class NotificationService {
                         Notification.builder()
                                 .setTitle(title)
                                 .setBody(body)
-                                .build()
-                );
+                                .build());
             }
 
             // Data
@@ -76,8 +72,7 @@ public class NotificationService {
 
             try {
                 FirebaseMessaging.getInstance().send(builder.build());
-            }
-            catch (FirebaseMessagingException e) {
+            } catch (FirebaseMessagingException e) {
 
                 String error = String.valueOf(e.getErrorCode());
 
@@ -86,10 +81,23 @@ public class NotificationService {
                         "invalid-argument".equals(error)) {
 
                     userTokenRepository.delete(token);
-                }
-                else {
+                } else {
                     throw new RuntimeException("Lỗi gửi FCM: " + error, e);
                 }
+            }
+        }
+    }
+
+    public void sendNotificationToMultiple(
+            List<String> firebaseUids,
+            String title,
+            String body,
+            Map<String, String> data) {
+        for (String uid : firebaseUids) {
+            try {
+                sendNotificationToFirebaseUid(uid, title, body, data);
+            } catch (Exception e) {
+                System.out.println("Lỗi gửi cho user " + uid + ": " + e.getMessage());
             }
         }
     }
