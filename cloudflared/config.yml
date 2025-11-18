@@ -1,0 +1,19 @@
+tunnel: cb93d6f4-1dff-457d-8db2-efd3ad564d9f
+credentials-file: /etc/cloudflared/cb93d6f4-1dff-457d-8db2-efd3ad564d9f.json
+
+ingress:
+  - hostname: chat.not.com
+    service: http://chatservice:8081
+  - hostname: api.not.com
+    service: http://apigateway-mocha:8080
+  - hostname: users.not.com
+    service: http://userservice:8082
+  - hostname: auth.not.com
+    service: http://authservice:8083
+  - hostname: post.not.com
+    service: http://postservice:8084
+  - hostname: notification.not.com
+    service: http://notificationservice:8085
+  - hostname: minio.not.com
+    service: http://minio:9000
+  - service: http_status:404

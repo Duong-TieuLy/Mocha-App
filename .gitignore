@@ -68,3 +68,5 @@ mssql-data/
 *.orig
 *.bak
 *.tmp
+cloudflared/*.json
+cloudflared/cert.pem
