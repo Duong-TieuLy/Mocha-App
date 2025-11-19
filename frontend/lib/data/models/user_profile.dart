@@ -23,7 +23,7 @@ enum Gender {
 }
 
 class UserProfile {
-  final int id;
+  final int id; // thay long -> int
   final String firebaseUid;
   final String fullName;
   final String email;
@@ -57,14 +57,15 @@ class UserProfile {
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
-      id: json['id'] as int,
+      id: json['id'] as int, // thay long -> int
       firebaseUid: json['firebaseUid'] as String,
       fullName: json['fullName'] as String? ?? '',
       email: json['email'] as String? ?? '',
       bio: json['bio'] as String? ?? '',
       interests: (json['interests'] as List<dynamic>?)
-          ?.map((e) => e.toString())
-          .toList() ?? [],
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
       photoUrl: json['photoUrl'] as String? ?? '',
       dateOfBirth: json['dateOfBirth'] != null
           ? DateTime.tryParse(json['dateOfBirth'].toString())
@@ -97,9 +98,8 @@ class UserProfile {
     };
   }
 
-  // Copy with method để update dễ dàng
   UserProfile copyWith({
-    int? id,
+    int? id, // thay long -> int
     String? firebaseUid,
     String? fullName,
     String? email,
