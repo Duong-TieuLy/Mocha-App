@@ -4,7 +4,6 @@ import 'package:frontend/presentation/screens/post_card.dart';
 import 'package:frontend/presentation/screens/scrollable_tab.dart';
 import 'package:provider/provider.dart';
 
-import '../../data/models/user_profile.dart';
 import '../view_models/user_view_model.dart';
 import 'profile_details_dialog.dart';
 

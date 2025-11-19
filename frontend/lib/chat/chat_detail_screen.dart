@@ -1001,7 +1001,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final isRecalled = msg['recalled'] == true;
     final createdAt = formatMessageTime(msg['createdAt']);
     final isImage = msg['type'] == 'image';
-    final _isPending = msg['pending'] == true;
     final imageUrl = msg['imageUrl'] ?? msg['content'] ?? '';
 
     Widget statusIcon;

@@ -429,25 +429,25 @@ class MessageApi {
       final decoded = jsonDecode(response.body);
 
       if (decoded is List) {
-        debugPrint('║ ✅ Loaded ${decoded.length} conversations');
-        debugPrint('╚═══════════════════════════════════════╝');
-        return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      }
+              debugPrint('║ ✅ Loaded ${decoded.length} conversations');
+              debugPrint('╚═══════════════════════════════════════╝');
+              return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+            }
 
-      if (decoded is Map) {
-        // Try different response structures
-        final List? data = decoded['data'] ?? decoded['conversations'];
+            // decoded must be Map if not List
+            if (decoded is Map<String, dynamic>) {
+              final data = decoded['data'] ?? decoded['conversations'];
 
-        if (data != null && data is List) {
-          debugPrint('║ ✅ Loaded ${data.length} conversations from nested structure');
-          debugPrint('╚═══════════════════════════════════════╝');
-          return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-        }
+              if (data is List) {
+                debugPrint('║ ✅ Loaded ${data.length} conversations from nested structure');
+                debugPrint('╚═══════════════════════════════════════╝');
+                return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+              }
 
-        debugPrint('║ ⚠️  Empty response - available keys: ${decoded.keys}');
-        debugPrint('╚═══════════════════════════════════════╝');
-        return [];
-      }
+              debugPrint('║ ⚠️  Empty response - available keys: ${decoded.keys}');
+              debugPrint('╚═══════════════════════════════════════╝');
+              return [];
+            }
 
       debugPrint('║ ⚠️  Unexpected response type: ${decoded.runtimeType}');
       debugPrint('╚═══════════════════════════════════════╝');
