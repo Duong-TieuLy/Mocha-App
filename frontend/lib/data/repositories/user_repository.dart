@@ -8,12 +8,13 @@ class UserRepository {
   final UserService userService;
 
   UserRepository({required this.userService});
-  Future<UserProfile?> getProfile(String uid) async {
-      debugPrint('Calling fetchProfile for UID: $uid');
-      final data = await userService.fetchProfile(uid);
-      debugPrint('Profile JSON: $data');
-      return data != null ? UserProfile.fromJson(data) : null;
-    }
+
+  Future<UserProfile> getProfile(String uid) async {
+    debugPrint('Calling fetchProfile for UID: $uid');
+    final data = await userService.fetchProfile(uid);
+    debugPrint('Profile JSON: $data');
+    return UserProfile.fromJson(data);
+  }
 
   Future<bool> updateProfile(String uid, Map<String, dynamic> updatedData) {
     return userService.updateProfile(uid, updatedData);
@@ -45,6 +46,4 @@ class UserRepository {
 
   Future<List<dynamic>> getFollowing(String uid) =>
       userService.getFollowing(uid);
-
-
 }

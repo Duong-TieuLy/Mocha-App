@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:frontend/data/services/auth_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
-import 'package:flutter/foundation.dart'; // ✅ ADD THIS
+import 'package:flutter/foundation.dart';
 
 class UserService {
   final String baseUrl;
@@ -11,7 +11,7 @@ class UserService {
 
   Future<Map<String, dynamic>> fetchProfile(String uid) async {
     final token = await AuthService().getToken();
-    debugPrint('Token: $token'); // ✅ CHANGED
+    debugPrint('Fetching profile for UID: $uid');
 
     final response = await http.get(
       Uri.parse('$baseUrl/api/users/profile'),
@@ -25,7 +25,7 @@ class UserService {
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
-      throw Exception('Failed to fetch profile');
+      throw Exception('Failed to fetch profile: ${response.statusCode}');
     }
   }
 
@@ -51,17 +51,10 @@ class UserService {
 
   Future<List<Map<String, dynamic>>> getFriends(String uid) async {
     try {
-      debugPrint("╔═══════════════════════════════════════╗");
-      debugPrint("║ 📡 UserService: getFriends            ║");
-      debugPrint("╠═══════════════════════════════════════╣");
-      debugPrint("║ UID: $uid");
-      debugPrint("║ Base URL: $baseUrl");
+      debugPrint("UserService: Getting friends for UID: $uid");
 
       final token = await AuthService().getToken();
-      debugPrint("║ Token: ${token?.substring(0, 20)}...");
-
       final url = Uri.parse('$baseUrl/api/users/follow/friends');
-      debugPrint("║ Full URL: $url");
 
       final response = await http.get(
         url,
@@ -72,70 +65,38 @@ class UserService {
       ).timeout(
         const Duration(seconds: 15),
         onTimeout: () {
-          throw Exception('⏱️ Request timeout after 15 seconds');
+          throw Exception('Request timeout after 15 seconds');
         },
       );
 
-      debugPrint("║ Status: ${response.statusCode}");
-      debugPrint("║ Response Body Length: ${response.body.length}");
-      debugPrint("║ Response Body: ${response.body}"); // ⬅️ THIS IS KEY!
+      debugPrint("Get friends response status: ${response.statusCode}");
 
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
-        debugPrint("║ Decoded type: ${decoded.runtimeType}"); // ⬅️ ADD THIS
 
         if (decoded is List) {
-          debugPrint("║ ✅ Response is List with ${decoded.length} items");
-
-          // ⬅️ LOG EACH ITEM
-          for (var i = 0; i < decoded.length; i++) {
-            final item = decoded[i];
-            debugPrint("║ Item $i: $item");
-            debugPrint("║   - firebaseUid: ${item['firebaseUid']}");
-            debugPrint("║   - fullName: ${item['fullName']}");
-            debugPrint("║   - photoUrl: ${item['photoUrl']}");
-          }
-
-          final List<Map<String, dynamic>> result = decoded.cast<Map<String, dynamic>>();
-          debugPrint("║ ✅ Returning ${result.length} friends");
-          debugPrint("╚═══════════════════════════════════════╝");
-          return result;
+          debugPrint("Successfully loaded ${decoded.length} friends");
+          return decoded.cast<Map<String, dynamic>>();
         }
 
-        // If it's a Map with nested data
-        if (decoded is Map) {
-          debugPrint("║ Response is Map with keys: ${decoded.keys}");
-
-          if (decoded['data'] is List) {
-            final List data = decoded['data'];
-            debugPrint("║ ✅ Found 'data' key with ${data.length} items");
-            debugPrint("╚═══════════════════════════════════════╝");
-            return data.cast<Map<String, dynamic>>();
-          }
+        if (decoded is Map && decoded['data'] is List) {
+          final List data = decoded['data'];
+          debugPrint("Successfully loaded ${data.length} friends from 'data' key");
+          return data.cast<Map<String, dynamic>>();
         }
 
-        debugPrint("║ ⚠️  Unknown response structure!");
-        debugPrint("╚═══════════════════════════════════════╝");
+        debugPrint("Warning: Unknown response structure");
         return [];
 
       } else if (response.statusCode == 404) {
-        debugPrint("║ ℹ️  404 - No friends yet");
-        debugPrint("╚═══════════════════════════════════════╝");
+        debugPrint("No friends found (404)");
         return [];
       } else {
-        debugPrint("║ ❌ Error: ${response.statusCode}");
-        debugPrint("║ Error Body: ${response.body}");
-        debugPrint("╚═══════════════════════════════════════╝");
         throw Exception('Failed to get friends: ${response.statusCode} - ${response.body}');
       }
     } catch (e, stackTrace) {
-      debugPrint("╔═══════════════════════════════════════╗");
-      debugPrint("║ ❌ EXCEPTION in getFriends            ║");
-      debugPrint("╠═══════════════════════════════════════╣");
-      debugPrint("║ Error: $e");
-      debugPrint("║ Stack trace:");
-      debugPrint(stackTrace.toString().split('\n').take(5).map((line) => '║ $line').join('\n'));
-      debugPrint("╚═══════════════════════════════════════╝");
+      debugPrint("Error in getFriends: $e");
+      debugPrint("Stack trace: ${stackTrace.toString().split('\n').take(3).join('\n')}");
       rethrow;
     }
   }
@@ -167,13 +128,16 @@ class UserService {
       headers: {
         'Authorization': 'Bearer $token',
         'X-User-Id': uid,
-        'Content-Type': 'application/json', // ✅ ADD THIS
+        'Content-Type': 'application/json',
       },
       body: json.encode(updatedData),
     );
 
-    debugPrint("Update status: ${response.statusCode}");
-    debugPrint("Update response: ${response.body}");
+    debugPrint("Update profile status: ${response.statusCode}");
+
+    if (response.statusCode != 200) {
+      debugPrint("Update profile error: ${response.body}");
+    }
 
     return response.statusCode == 200;
   }
