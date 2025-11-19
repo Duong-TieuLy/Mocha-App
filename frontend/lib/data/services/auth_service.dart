@@ -51,7 +51,7 @@ class AuthService {
           'email': email,
           'password': password,
           'confirmPassword': confirmPassword,
-          'displayName': displayName,
+          'displayName': displayName.isNotEmpty ? displayName : null,
         }),
       );
 
@@ -70,16 +70,16 @@ class AuthService {
       // }
 
       final authUser = AuthModel.fromJson(data);
-
+      print(authUser);
       // 🔹 Lưu token & UID từ backend
       await _saveAuth(data["token"], data["uid"]);
 
       // 🔹 Lấy FCM token và gửi về backend
       final fcmToken = await _messaging.getToken();
+      print("FCM token: $fcmToken");
       if (fcmToken != null) {
         await _saveFcmToken(data["uid"], fcmToken);
       }
-
       return authUser;
     } catch (e) {
       rethrow;
@@ -107,12 +107,14 @@ class AuthService {
   }
 
   Future<void> _saveFcmToken(String uid, String fcmToken) async {
+    print('Saving FCM token for uid=$uid, token=$fcmToken');
     try {
       final response = await http.post(
         Uri.parse('$notificationBaseUrl/save-token'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'firebaseUid': uid, 'fcmToken': fcmToken}),
       );
+      print('Response status: ${response.statusCode}, body: ${response.body}');
       if (response.statusCode != 200) {
         print('FCM token not saved: ${response.body}');
       }

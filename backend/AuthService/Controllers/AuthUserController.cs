@@ -72,8 +72,15 @@ namespace AuthService.Services
                 {
                     Console.WriteLine($"🚫 Error calling UserService: {ex.Message}");
                 }
+                var token = await _firebaseAuthService.GenerateCustomTokenAsync(firebaseUser.Uid);
+                return Ok(new
+                {
+                    uid = firebaseUser.Uid,
+                    email = firebaseUser.Email,
+                    displayName = firebaseUser.DisplayName ?? "",
+                    token = token
+                });
 
-                return Ok(new { uid = firebaseUser.Uid, email = firebaseUser.Email });
             }
             catch (Exception ex)
             {

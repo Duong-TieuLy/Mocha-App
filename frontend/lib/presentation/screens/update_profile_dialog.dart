@@ -202,7 +202,9 @@ class UpdateProfileDialog {
                           .map((e) => e.trim())
                           .where((e) => e.isNotEmpty)
                           .toList(),
-                      'photoUrl': photoUrlController.text.trim(),
+                      'photoUrl': photoUrlController.text.trim().isEmpty
+                          ? null
+                          : photoUrlController.text.trim(),
                       'location': locationController.text.trim().isEmpty
                           ? null
                           : locationController.text.trim(),

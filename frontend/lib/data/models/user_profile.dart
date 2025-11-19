@@ -55,20 +55,38 @@ class UserProfile {
     required this.createdAt,
   });
 
+  // factory UserProfile.fromJson(Map<String, dynamic> json) {
+  //   return UserProfile(
+  //     id: json['id'] as int,
+  //     firebaseUid: json['firebaseUid'] as String,
+  //     fullName: json['fullName'] as String? ?? '',
+  //     email: json['email'] as String? ?? '',
+  //     bio: json['bio'] as String? ?? '',
+  //     interests: (json['interests'] as List<dynamic>?)
+  //         ?.map((e) => e.toString())
+  //         .toList() ?? [],
+  //     photoUrl: json['photoUrl'] as String? ?? '',
+  //     dateOfBirth: json['dateOfBirth'] != null
+  //         ? DateTime.tryParse(json['dateOfBirth'].toString())
+  //         : null,
+  //     location: json['location'] as String?,
+  //     gender: Gender.fromString(json['gender'] as String?),
+  //     phoneNumber: json['phoneNumber'] as String?,
+  //     followersCount: json['followersCount'] as int? ?? 0,
+  //     followingCount: json['followingCount'] as int? ?? 0,
+  //     createdAt: json['createdAt'] as String? ?? '',
+  //   );
+  // }
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
-      id: json['id'] as int,
-      firebaseUid: json['firebaseUid'] as String,
+      id: json['id'] as int? ?? 0,
+      firebaseUid: json['firebaseUid'] as String? ?? '',
       fullName: json['fullName'] as String? ?? '',
       email: json['email'] as String? ?? '',
       bio: json['bio'] as String? ?? '',
-      interests: (json['interests'] as List<dynamic>?)
-          ?.map((e) => e.toString())
-          .toList() ?? [],
+      interests: (json['interests'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
       photoUrl: json['photoUrl'] as String? ?? '',
-      dateOfBirth: json['dateOfBirth'] != null
-          ? DateTime.tryParse(json['dateOfBirth'].toString())
-          : null,
+      dateOfBirth: json['dateOfBirth'] != null ? DateTime.tryParse(json['dateOfBirth'].toString()) : null,
       location: json['location'] as String?,
       gender: Gender.fromString(json['gender'] as String?),
       phoneNumber: json['phoneNumber'] as String?,
@@ -77,6 +95,7 @@ class UserProfile {
       createdAt: json['createdAt'] as String? ?? '',
     );
   }
+
 
   Map<String, dynamic> toJson() {
     return {

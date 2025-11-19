@@ -29,13 +29,15 @@ class _ProfilePageState extends State<ProfilePage>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final currentUser = FirebaseAuth.instance.currentUser;
       final uid = currentUser?.uid;
-      print(uid);
+      print('Current UID: $uid');
+
       if (uid != null) {
         final vm = Provider.of<UserViewModel>(context, listen: false);
-        vm.loadProfile(uid);
+        await vm.loadProfile(uid); // chờ load xong
+        print('Profile loaded: ${vm.profile}');
       }
     });
   }
@@ -55,6 +57,7 @@ class _ProfilePageState extends State<ProfilePage>
         body: Consumer<UserViewModel>(
             builder: (context, vm, _){
               final profile = vm.profile;
+              print(profile);
               return NestedScrollView(
                   headerSliverBuilder: (context, innerBoxIsScrolled) {
                     return [
@@ -192,9 +195,9 @@ class _ProfilePageState extends State<ProfilePage>
                                                   decoration: BoxDecoration(
                                                     shape: BoxShape.circle,
                                                     image:  DecorationImage(
-                                                      image: profile != null
+                                                      image: (profile != null && profile.photoUrl.isNotEmpty)
                                                           ? NetworkImage(profile.photoUrl)
-                                                          : AssetImage('assets/images/man.png'),
+                                                          : const AssetImage('assets/images/man.png') as ImageProvider,
                                                       fit: BoxFit.cover,
                                                     ),
                                                     border: Border.all(color: Colors.white, width: 3),

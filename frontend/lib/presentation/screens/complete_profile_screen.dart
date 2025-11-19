@@ -1,4 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:frontend/data/models/user_profile.dart';
+import 'package:frontend/presentation/view_models/user_view_model.dart';
 
 class CompleteProfileScreen extends StatelessWidget {
   const CompleteProfileScreen({super.key});
@@ -70,8 +73,25 @@ class CompleteProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 32),
                   ElevatedButton(
-                    onPressed: () =>
-                        Navigator.pushNamed(context, '/upload-photo'),
+                    onPressed: () async {
+                      final uid = FirebaseAuth.instance.currentUser?.uid;
+                      if (uid == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('User not logged in')),
+                        );
+                        return;
+                      }
+                      final updateData = <String, dynamic>{
+                        'fullName': nameController.text.trim(),
+                        'bio': bioController.text.trim(),
+                        'interests': interestController.text
+                            .split(',')
+                            .map((e) => e.trim())
+                            .where((e) => e.isNotEmpty)
+                            .toList(),
+                      };
+                    },
+                    // Navigator.pushNamed(context, '/upload-photo'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2196F3),
                       shape: RoundedRectangleBorder(

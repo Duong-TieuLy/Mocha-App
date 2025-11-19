@@ -19,7 +19,17 @@ namespace AuthService.Services
             _auth = FirebaseAuth.GetAuth(FirebaseApp.DefaultInstance);
         }
 
-        public async Task<UserRecord> CreateUserAsync(string email, string password, string displayName = null)
+        // public async Task<UserRecord> CreateUserAsync(string email, string password, string displayName = null)
+        // {
+        //     var args = new UserRecordArgs()
+        //     {
+        //         Email = email,
+        //         Password = password,
+        //         DisplayName = displayName
+        //     };
+        //     return await _auth.CreateUserAsync(args);
+        // }
+        public async Task<UserRecord> CreateUserAsync(string email, string password, string? displayName)
         {
             var args = new UserRecordArgs()
             {
@@ -27,9 +37,8 @@ namespace AuthService.Services
                 Password = password,
                 DisplayName = displayName
             };
-            return await _auth.CreateUserAsync(args);
+            return await FirebaseAuth.DefaultInstance.CreateUserAsync(args);
         }
-
         public async Task<UserRecord> GetUserByUidAsync(string uid)
         {
             return await _auth.GetUserAsync(uid);
@@ -44,6 +53,10 @@ namespace AuthService.Services
         {
             var decodedToken = await _auth.VerifyIdTokenAsync(idToken);
             return decodedToken.Uid;
+        }
+        public async Task<string> GenerateCustomTokenAsync(string uid)
+        {
+            return await FirebaseAuth.DefaultInstance.CreateCustomTokenAsync(uid);
         }
     }
 }

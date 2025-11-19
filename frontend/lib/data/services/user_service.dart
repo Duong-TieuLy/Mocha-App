@@ -17,6 +17,8 @@ class UserService {
         'Authorization': 'Bearer $token',
       },
     );
+    print('Response status code: ${response.statusCode}');
+    print('Response body: ${response.body}');
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
@@ -66,12 +68,12 @@ class UserService {
 
   Future<bool> updateProfile(String uid, Map<String, dynamic> updatedData) async {
     final token = await AuthService().getToken();
-
     final response = await http.put(
       Uri.parse('$baseUrl/api/users/me'),
       headers: {
         'Authorization': 'Bearer $token',
         'X-User-Id': uid,
+        'Content-Type': 'application/json', // ⚠️ thêm cái này
       },
       body: json.encode(updatedData),
     );

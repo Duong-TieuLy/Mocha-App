@@ -48,50 +48,79 @@ class _SignupScreenState extends State<SignupScreen> {
 
                 // 🔵 Nút đăng ký
                 Center(
-                  child: vm.isLoading
-                      ? const CircularProgressIndicator()
-                      : ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 40,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: () async {
-                      await vm.signup(
-                        email: _emailCtrl.text.trim(),
-                        password: _passwordCtrl.text.trim(),
-                        confirmPassword: _confirmPasswordCtrl.text.trim(),
-                        displayName: _usernameCtrl.text.trim(),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    transitionBuilder: (child, animation) {
+                      return FadeTransition(
+                        opacity: animation,
+                        child: SizeTransition(
+                          sizeFactor: animation,
+                          axis: Axis.horizontal,
+                          child: child,
+                        ),
                       );
-
-                      if (vm.errorMessage == null) {
-                        // Thành công → sang Congratulations
-                        if (mounted) {
-                          Navigator.pushReplacementNamed(
-                              context, '/congratulations');
-                        }
-                      } else {
-                        // Thất bại → popup lỗi
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(vm.errorMessage!)),
-                        );
-                      }
                     },
-                    child: const Text(
-                      "Sign Up",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                    child: vm.isLoading
+                        ? const SizedBox(
+                      key: ValueKey('loading'),
+                      height: 48,
+                      width: 48,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        color: Colors.blue,
+                      ),
+                    )
+                        : ElevatedButton(
+                      key: const ValueKey('signup_button'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 40,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () async {
+                        // Thêm loading state nếu VM chưa tự set
+                        if (!vm.isLoading) {
+                          await vm.signup(
+                            email: _emailCtrl.text.trim(),
+                            password: _passwordCtrl.text.trim(),
+                            confirmPassword: _confirmPasswordCtrl.text.trim(),
+                            displayName: _usernameCtrl.text.trim(),
+                          );
+
+                          // Nếu mounted thì mới thao tác UI
+                          if (!mounted) return;
+
+                          if (vm.errorMessage == null) {
+                            Navigator.pushReplacementNamed(
+                                context, '/congratulations');
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(vm.errorMessage!),
+                                backgroundColor: Colors.red,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      child: const Text(
+                        "Sign Up",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 20),
                 Center(
                   child: Row(
