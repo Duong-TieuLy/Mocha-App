@@ -23,7 +23,7 @@ enum Gender {
 }
 
 class UserProfile {
-  final int id;
+  final int id; // thay long -> int
   final String firebaseUid;
   final String fullName;
   final String email;
@@ -116,9 +116,8 @@ class UserProfile {
     };
   }
 
-  // Copy with method để update dễ dàng
   UserProfile copyWith({
-    int? id,
+    int? id, // thay long -> int
     String? firebaseUid,
     String? fullName,
     String? email,

@@ -2,6 +2,7 @@ package com.example.chat.controller;
 
 import com.example.chat.model.Message;
 import com.example.chat.service.MessageService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,14 +19,20 @@ public class ConversationController {
         this.messageService = messageService;
     }
 
-    @GetMapping("/{userId}")
-    public ResponseEntity<?> getUserConversations(@PathVariable String userId) {
+    /**
+     * 🔥 GET /api/conversations/user/{firebaseUid}
+     * Lấy danh sách conversations của user (match với Flutter)
+     */
+    @GetMapping("/user/{firebaseUid}")
+    public ResponseEntity<?> getUserConversations(@PathVariable String firebaseUid) {
         try {
+            System.out.println("🔍 Getting conversations for user: " + firebaseUid);
+
             // ✅ Lấy TẤT CẢ tin nhắn mà user này tham gia (gửi HOẶC nhận)
-            List<Message> allMessages = messageService.getMessagesForUser(userId);
+            List<Message> allMessages = messageService.getMessagesForUser(firebaseUid);
 
             if (allMessages.isEmpty()) {
-                // ✅ Trả về empty array thay vì 404
+                System.out.println("📭 No messages found for user: " + firebaseUid);
                 return ResponseEntity.ok(Collections.emptyList());
             }
 
@@ -48,39 +55,41 @@ public class ConversationController {
                 if (lastMessage == null) continue;
 
                 // ✅ Extract participants từ conversationId
-                // Format: "user1-user2-chat" hoặc "bella-tommy-chat"
-                List<String> participants = extractParticipants(conversationId, userId);
+                List<String> participants = extractParticipants(conversationId);
 
                 // ✅ Build conversation object
                 Map<String, Object> conversation = new HashMap<>();
                 conversation.put("conversationId", conversationId);
                 conversation.put("participants", participants);
 
-                // Last message info
+                // Last message info (format phù hợp với Flutter)
                 Map<String, Object> lastMsgInfo = new HashMap<>();
                 lastMsgInfo.put("id", lastMessage.getId());
                 lastMsgInfo.put("senderId", lastMessage.getSenderId());
-                lastMsgInfo.put("content", lastMessage.isRecalled()
-                        ? "Tin nhắn đã được thu hồi"
-                        : lastMessage.getContent());
-                lastMsgInfo.put("type", lastMessage.getType());
-                lastMsgInfo.put("createdAt", lastMessage.getCreatedAt());
+
+                // ✅ Handle recalled messages
+                if (lastMessage.isRecalled()) {
+                    lastMsgInfo.put("content", "Tin nhắn đã được thu hồi");
+                } else {
+                    lastMsgInfo.put("content", lastMessage.getContent());
+                }
+
+                lastMsgInfo.put("type", lastMessage.getType() != null ? lastMessage.getType() : "text");
+                lastMsgInfo.put("createdAt", lastMessage.getCreatedAt().toString());
+                lastMsgInfo.put("timestamp", lastMessage.getCreatedAt().toString()); // Flutter dùng cả 2
                 lastMsgInfo.put("recalled", lastMessage.isRecalled());
 
                 conversation.put("lastMessage", lastMsgInfo);
 
-                // ✅ Calculate unread count (messages where receiverId = userId and status != read)
+                // ✅ Calculate unread count
                 long unreadCount = messages.stream()
                         .filter(msg -> {
-                            // Nếu message có receiverId và = userId và chưa đọc
-                            String receiverId = msg.getReceiverId();
-                            if (receiverId != null && receiverId.equals(userId)) {
+                            // Message mà user là receiver và chưa đọc
+                            if (firebaseUid.equals(msg.getReceiverId())) {
                                 String status = msg.getStatus();
                                 return status == null || !status.equals("read");
                             }
-                            // Nếu không có receiverId riêng, check senderId
-                            // Message không phải của mình = chưa đọc
-                            return !msg.getSenderId().equals(userId);
+                            return false;
                         })
                         .count();
 
@@ -102,43 +111,181 @@ public class ConversationController {
                 return timeB.compareTo(timeA); // Descending
             });
 
-            System.out.println("✅ Found " + conversations.size() + " conversations for user: " + userId);
+            System.out.println("✅ Found " + conversations.size() + " conversations for user: " + firebaseUid);
 
             return ResponseEntity.ok(conversations);
 
         } catch (Exception e) {
-            System.err.println("❌ Error fetching conversations for user: " + userId);
+            System.err.println("❌ Error fetching conversations for user: " + firebaseUid);
             e.printStackTrace();
-            // ✅ Return empty array on error instead of 500
             return ResponseEntity.ok(Collections.emptyList());
         }
     }
 
     /**
-     * Extract participants from conversationId
-     * Format: "user1-user2-chat" or "bella-tommy-chat"
+     * 🔥 POST /api/conversations/create
+     * Tạo conversationId từ 2 firebaseUid
      */
-    private List<String> extractParticipants(String conversationId, String currentUserId) {
+    @PostMapping("/create")
+    public ResponseEntity<?> createConversation(@RequestBody Map<String, String> request) {
+        try {
+            String user1 = request.get("user1");
+            String user2 = request.get("user2");
+
+            if (user1 == null || user2 == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "error", "Both user1 and user2 are required"
+                ));
+            }
+
+            // Create conversationId (sorted để đảm bảo unique)
+            List<String> sorted = Arrays.asList(user1, user2);
+            Collections.sort(sorted);
+            String conversationId = sorted.get(0) + "-" + sorted.get(1) + "-chat";
+
+            // Check if conversation exists (has messages)
+            List<Message> existingMessages = messageService.getHistory(conversationId);
+            boolean exists = !existingMessages.isEmpty();
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "conversationId", conversationId,
+                    "exists", exists
+            ));
+        } catch (Exception e) {
+            System.err.println("❌ Error creating conversation");
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * 🔥 PUT /api/conversations/{conversationId}/read
+     * Đánh dấu tất cả messages trong conversation là đã đọc
+     */
+    @PutMapping("/{conversationId}/read")
+    public ResponseEntity<?> markAsRead(
+            @PathVariable String conversationId,
+            @RequestBody Map<String, String> request
+    ) {
+        try {
+            String userId = request.get("userId");
+
+            if (userId == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "error", "userId is required"
+                ));
+            }
+
+            // Get all messages in conversation
+            List<Message> messages = messageService.getHistory(conversationId);
+            int markedCount = 0;
+
+            for (Message message : messages) {
+                // Chỉ update messages mà user là receiver và chưa đọc
+                if (userId.equals(message.getReceiverId()) && !"read".equals(message.getStatus())) {
+                    message.setStatus("read");
+                    messageService.save(message, null);
+                    markedCount++;
+                }
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "markedCount", markedCount,
+                    "message", markedCount + " messages marked as read"
+            ));
+        } catch (Exception e) {
+            System.err.println("❌ Error marking conversation as read: " + conversationId);
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * 🔥 GET /api/conversations/unread-count/{firebaseUid}
+     * Lấy tổng số messages chưa đọc của user
+     */
+    @GetMapping("/unread-count/{firebaseUid}")
+    public ResponseEntity<?> getUnreadCount(@PathVariable String firebaseUid) {
+        try {
+            List<Message> userMessages = messageService.getMessagesForUser(firebaseUid);
+
+            long unreadCount = userMessages.stream()
+                    .filter(m -> firebaseUid.equals(m.getReceiverId()))
+                    .filter(m -> !"read".equals(m.getStatus()))
+                    .count();
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "unreadCount", unreadCount
+            ));
+        } catch (Exception e) {
+            System.err.println("❌ Error getting unread count for user: " + firebaseUid);
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * 🔥 GET /api/conversations/{conversationId}/exists
+     * Kiểm tra conversation có tồn tại không
+     */
+    @GetMapping("/{conversationId}/exists")
+    public ResponseEntity<?> checkConversationExists(@PathVariable String conversationId) {
+        try {
+            List<Message> messages = messageService.getHistory(conversationId);
+            boolean exists = !messages.isEmpty();
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "exists", exists,
+                    "conversationId", conversationId
+            ));
+        } catch (Exception e) {
+            System.err.println("❌ Error checking conversation: " + conversationId);
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * Extract participants from conversationId
+     * Format: "user1-user2-chat"
+     */
+    private List<String> extractParticipants(String conversationId) {
         List<String> participants = new ArrayList<>();
 
-        // Add current user first
-        participants.add(currentUserId);
-
-        // Parse conversationId to find other participant
         String[] parts = conversationId.split("-");
 
         if (parts.length >= 2) {
-            String user1 = parts[0];
-            String user2 = parts[1];
-
-            // Add the other user (not current user)
-            if (!user1.equals(currentUserId)) {
-                participants.add(user1);
-            } else if (!user2.equals(currentUserId)) {
-                participants.add(user2);
-            }
+            participants.add(parts[0]);
+            participants.add(parts[1]);
         }
 
         return participants;
+    }
+
+    /**
+     * 🔥 Backward compatibility: Support old endpoint
+     * GET /api/conversations/{userId} → redirect to /api/conversations/user/{userId}
+     */
+    @GetMapping("/{userId}")
+    public ResponseEntity<?> getUserConversationsLegacy(@PathVariable String userId) {
+        return getUserConversations(userId);
     }
 }

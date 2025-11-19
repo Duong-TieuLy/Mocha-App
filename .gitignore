@@ -14,7 +14,7 @@ Thumbs.db
 # ================================
 # Firebase / Google Cloud
 firebase-adminsdk.json
-**/firebase-adminsdk.json
+backend/AuthService/firebase-adminsdk.json
 **/serviceAccountKey.json
 
 # Certificates / Keys
