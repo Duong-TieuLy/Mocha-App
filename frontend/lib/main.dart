@@ -1,5 +1,6 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:frontend/presentation/view_models/profile_view_model.dart';
 import 'package:frontend/presentation/view_models/user_view_model.dart';
@@ -44,7 +45,7 @@ const AndroidNotificationChannel defaultChannel = AndroidNotificationChannel(
 // =======================
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  print("🔔 Background message: ${message.notification?.title}");
+  debugPrint("🔔 Background message: ${message.notification?.title}");
 }
 
 void main() async {
@@ -82,7 +83,7 @@ void main() async {
   // 🔥 Handle Foreground message
   // ============================
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    print("🔥 Foreground FCM: ${message.notification?.title}");
+    debugPrint("🔥 Foreground FCM: ${message.notification?.title}");
 
     final notification = message.notification;
     final android = message.notification?.android;

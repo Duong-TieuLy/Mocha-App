@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -116,10 +117,10 @@ class AuthService {
       );
       print('Response status: ${response.statusCode}, body: ${response.body}');
       if (response.statusCode != 200) {
-        print('FCM token not saved: ${response.body}');
+        debugPrint('FCM token not saved: ${response.body}');
       }
     } catch (e) {
-      print('Error saving FCM token: $e');
+      debugPrint('Error saving FCM token: $e');
     }
   }
 

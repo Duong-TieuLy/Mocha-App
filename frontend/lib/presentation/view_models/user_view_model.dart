@@ -22,7 +22,7 @@ class UserViewModel extends ChangeNotifier {
   bool isLoadingFollowing = false;
 
   /// FOLLOW STATE CHO USER ĐANG XEM
-  /// Map<userId, bool>
+  /// Map: userId -> bool
   final Map<int, bool> _followingCache = {};
   final Map<int, bool> _friendCache = {};
 
@@ -36,14 +36,11 @@ class UserViewModel extends ChangeNotifier {
     _setLoading(true);
     try {
       final result = await repository.getProfile(uid);
-      if (result != null) {
-        _profile = result;
-        _error = null;
-      } else {
-        _error = 'User not found';
-      }
+      _profile = result;
+      _error = null;
     } catch (e) {
       _error = e.toString();
+      _profile = null;
     } finally {
       _setLoading(false);
     }
