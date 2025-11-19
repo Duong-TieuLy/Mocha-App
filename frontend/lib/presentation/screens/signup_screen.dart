@@ -1,39 +1,56 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-class SignupScreen extends StatelessWidget {
+import '../view_models/auth_view_model.dart';
+
+
+class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 
   @override
+  State<SignupScreen> createState() => _SignupScreenState();
+}
+
+class _SignupScreenState extends State<SignupScreen> {
+  final _usernameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _confirmPasswordCtrl = TextEditingController();
+
+  @override
   Widget build(BuildContext context) {
+    final vm = context.watch<AuthViewModel>();
+
     return Scaffold(
       body: Stack(
         children: [
-          // Vòng tròn nền trang trí
           Positioned(top: -60, left: -40, child: _circle(200)),
+
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 60),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 40),
-                const Text(
-                  "Create Account",
-                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-                ),
+                const Text("Create Account",
+                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
                 const Text("Connect with your friends today"),
                 const SizedBox(height: 40),
-                _inputField("Username"),
+
+                _inputField("Username", controller: _usernameCtrl),
                 const SizedBox(height: 15),
-                _inputField("Email"),
+                _inputField("Email", controller: _emailCtrl),
                 const SizedBox(height: 15),
-                _inputField("Phone Number"),
+                _inputField("Password", controller: _passwordCtrl, isPassword: true),
                 const SizedBox(height: 15),
-                _inputField("Password", isPassword: true),
+                _inputField("Confirm Password", controller: _confirmPasswordCtrl, isPassword: true),
                 const SizedBox(height: 25),
 
-                // Nút đăng ký
+                // 🔵 Nút đăng ký
                 Center(
-                  child: ElevatedButton(
+                  child: vm.isLoading
+                      ? const CircularProgressIndicator()
+                      : ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       padding: const EdgeInsets.symmetric(
@@ -44,9 +61,26 @@ class SignupScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    onPressed: () {
-                      // ✅ Sau khi tạo tài khoản xong, chuyển sang màn hình Congratulations
-                      Navigator.pushReplacementNamed(context, '/congratulations');
+                    onPressed: () async {
+                      await vm.signup(
+                        email: _emailCtrl.text.trim(),
+                        password: _passwordCtrl.text.trim(),
+                        confirmPassword: _confirmPasswordCtrl.text.trim(),
+                        displayName: _usernameCtrl.text.trim(),
+                      );
+
+                      if (vm.errorMessage == null) {
+                        // Thành công → sang Congratulations
+                        if (mounted) {
+                          Navigator.pushReplacementNamed(
+                              context, '/congratulations');
+                        }
+                      } else {
+                        // Thất bại → popup lỗi
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(vm.errorMessage!)),
+                        );
+                      }
                     },
                     child: const Text(
                       "Sign Up",
@@ -58,10 +92,7 @@ class SignupScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-
-                const Spacer(),
-
-                // Chuyển sang login
+                const SizedBox(height: 20),
                 Center(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -81,7 +112,7 @@ class SignupScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                )
+                ),
               ],
             ),
           ),
@@ -90,15 +121,19 @@ class SignupScreen extends StatelessWidget {
     );
   }
 
-  Widget _inputField(String label, {bool isPassword = false}) => TextField(
-    obscureText: isPassword,
-    decoration: InputDecoration(
-      labelText: label,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+  Widget _inputField(String label,
+      {required TextEditingController controller, bool isPassword = false}) {
+    return TextField(
+      controller: controller,
+      obscureText: isPassword,
+      decoration: InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   Widget _circle(double size) => Container(
     width: size,

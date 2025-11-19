@@ -2,14 +2,17 @@ import 'dart:convert';
 import 'package:frontend/data/services/auth_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 class UserService {
   final String baseUrl;
 
   UserService({required this.baseUrl});
+
   Future<Map<String, dynamic>> fetchProfile(String uid) async {
-    final token = await AuthService().getToken(); // await là bắt buộc
-    print('Token: $token');
+    final token = await AuthService().getToken();
+    debugPrint('Fetching profile for UID: $uid');
+
     final response = await http.get(
       Uri.parse('$baseUrl/api/users/profile'),
       headers: {
@@ -17,10 +20,11 @@ class UserService {
         'Authorization': 'Bearer $token',
       },
     );
+
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
-      throw Exception('Failed to fetch profile');
+      throw Exception('Failed to fetch profile: ${response.statusCode}');
     }
   }
 
@@ -37,10 +41,62 @@ class UserService {
 
     if (response.statusCode == 200) {
       final respStr = await response.stream.bytesToString();
-      return respStr; // backend trả về URL ảnh
+      return respStr;
     } else {
       final respStr = await response.stream.bytesToString();
       throw Exception('Failed to upload image: $respStr');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getFriends(String uid) async {
+    try {
+      debugPrint("UserService: Getting friends for UID: $uid");
+
+      final token = await AuthService().getToken();
+      final url = Uri.parse('$baseUrl/api/users/follow/friends');
+
+      final response = await http.get(
+        url,
+        headers: {
+          'X-User-Id': uid,
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          throw Exception('Request timeout after 15 seconds');
+        },
+      );
+
+      debugPrint("Get friends response status: ${response.statusCode}");
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+
+        if (decoded is List) {
+          debugPrint("Successfully loaded ${decoded.length} friends");
+          return decoded.cast<Map<String, dynamic>>();
+        }
+
+        if (decoded is Map && decoded['data'] is List) {
+          final List data = decoded['data'];
+          debugPrint("Successfully loaded ${data.length} friends from 'data' key");
+          return data.cast<Map<String, dynamic>>();
+        }
+
+        debugPrint("Warning: Unknown response structure");
+        return [];
+
+      } else if (response.statusCode == 404) {
+        debugPrint("No friends found (404)");
+        return [];
+      } else {
+        throw Exception('Failed to get friends: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e, stackTrace) {
+      debugPrint("Error in getFriends: $e");
+      debugPrint("Stack trace: ${stackTrace.toString().split('\n').take(3).join('\n')}");
+      rethrow;
     }
   }
 
@@ -70,15 +126,18 @@ class UserService {
     final response = await http.put(
       Uri.parse('$baseUrl/api/users/me'),
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
         'X-User-Id': uid,
+        'Content-Type': 'application/json',
       },
       body: json.encode(updatedData),
     );
 
-    print("Update status: ${response.statusCode}");
-    print("Update response: ${response.body}");
+    debugPrint("Update profile status: ${response.statusCode}");
+
+    if (response.statusCode != 200) {
+      debugPrint("Update profile error: ${response.body}");
+    }
 
     return response.statusCode == 200;
   }
@@ -166,5 +225,4 @@ class UserService {
 
     return json.decode(response.body);
   }
-
 }

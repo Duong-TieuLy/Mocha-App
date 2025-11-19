@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 
+import '../../data/models/post_model.dart';
+import '../../data/services/post_service.dart';
+
 // Widget riêng cho dialog đăng post
 class PostDialog extends StatefulWidget {
   // Callback để thông báo khi post được tạo (truyền dữ liệu post mới về ExplorePage)
@@ -29,7 +32,7 @@ class _PostDialogState extends State<PostDialog> {
   }
 
   // Hàm đăng post
-  void _post() {
+  void _post() async {
     if (_captionController.text.isNotEmpty || _selectedImage != null) {
       // Tạo post mới với Map
       final newPost = {
@@ -40,10 +43,10 @@ class _PostDialogState extends State<PostDialog> {
         'likes': 0, // Bắt đầu với 0 like
         'comments': 0, // Bắt đầu với 0 comment
       };
-
+      final Post post = Post.fromJson(newPost);
       // Gọi callback để cập nhật danh sách posts trong ExplorePage
       widget.onPostCreated(newPost);
-
+      await PostService(baseUrl: 'http://10.0.2.2:8000').createPost(post);
       // Reset form
       _captionController.clear();
       setState(() {

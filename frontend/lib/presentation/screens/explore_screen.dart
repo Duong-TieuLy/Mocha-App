@@ -331,14 +331,14 @@ class _ExplorePageState extends State<ExplorePage> {
               const Center(child: Icon(Icons.error, color: Colors.red)),
             )
                 : Image.file(
-              File(image),
-              height: 200,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
-          ],
-        ),
-      )
+                  File(image),
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                 ),
+          ),
+        ],
+      ),
     );
   }
 }

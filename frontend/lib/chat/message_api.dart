@@ -3,9 +3,10 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' as http_parser; // ✅ ADD THIS
 import 'package:flutter/foundation.dart';
+import 'dart:async';
 
 class MessageApi {
-  static const String baseUrl = 'http://localhost:8081/api';
+  static const String baseUrl = "http://10.0.2.2:8081/api";
 
   // ═══════════════════════════════════════════════════════════════
   // 📤 SEND MESSAGE
@@ -370,52 +371,117 @@ class MessageApi {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // 🆕 GET USER CONVERSATIONS
+  // 🆕 GET USER CONVERSATIONS - ✅ IMPROVED VERSION
   // ═══════════════════════════════════════════════════════════════
-  static Future<List<Map<String, dynamic>>> getUserConversations(String userId, {Map<String, String>? extraHeaders}) async {
+  static Future<List<Map<String, dynamic>>> getUserConversations(
+    String userId, {
+    Map<String, String>? extraHeaders,
+    int timeoutSeconds = 30, // ⬅️ Tăng default timeout lên 30s
+  }) async {
     final url = Uri.parse('$baseUrl/conversations/$userId');
+
     try {
-      debugPrint('🔍 Fetching conversations for user: $userId from $url');
+      debugPrint('╔═══════════════════════════════════════╗');
+      debugPrint('║ 🔍 GET USER CONVERSATIONS             ║');
+      debugPrint('╠═══════════════════════════════════════╣');
+      debugPrint('║ User ID: $userId');
+      debugPrint('║ URL: $url');
+      debugPrint('║ Timeout: ${timeoutSeconds}s');
 
       final headers = {'Accept': 'application/json'};
       if (extraHeaders != null) headers.addAll(extraHeaders);
 
-      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 10));
+      // ⬅️ Tăng timeout và xử lý tốt hơn
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(
+            Duration(seconds: timeoutSeconds),
+            onTimeout: () {
+              debugPrint('║ ⏱️ Request TIMEOUT after ${timeoutSeconds}s');
+              // Trả về response giả để xử lý ở catch
+              throw TimeoutException(
+                'Backend không phản hồi sau ${timeoutSeconds}s',
+                Duration(seconds: timeoutSeconds),
+              );
+            },
+          );
 
-      debugPrint('📩 Response status: ${response.statusCode}');
+      debugPrint('║ ✅ Status: ${response.statusCode}');
+      debugPrint('║ Response Length: ${response.body.length} bytes');
+      debugPrint('║ Response Body: ${response.body}');
 
+      // Handle 404 - No conversations
       if (response.statusCode == 404) {
-        debugPrint('ℹ️  No conversations found for user (404) - returning empty list');
+        debugPrint('║ ℹ️  No conversations found (404)');
+        debugPrint('╚═══════════════════════════════════════╝');
         return [];
       }
 
+      // Handle error status codes
       if (response.statusCode != 200) {
-        debugPrint('❌ Error fetching conversations: ${response.statusCode}');
+        debugPrint('║ ❌ Error Status: ${response.statusCode}');
+        debugPrint('║ Error Body: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}');
+        debugPrint('╚═══════════════════════════════════════╝');
         return [];
       }
 
+      // Parse successful response
       final decoded = jsonDecode(response.body);
 
       if (decoded is List) {
-        return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      }
+              debugPrint('║ ✅ Loaded ${decoded.length} conversations');
+              debugPrint('╚═══════════════════════════════════════╝');
+              return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+            }
 
-      if (decoded is Map) {
-        if (decoded['data'] is List) {
-          return (decoded['data'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
-        }
-        if (decoded['conversations'] is List) {
-          return (decoded['conversations'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
-        }
+            // decoded must be Map if not List
+            if (decoded is Map<String, dynamic>) {
+              final data = decoded['data'] ?? decoded['conversations'];
 
-        debugPrint('⚠️ getUserConversations: unknown response shape, keys: ${decoded.keys}');
-        return [];
-      }
+              if (data is List) {
+                debugPrint('║ ✅ Loaded ${data.length} conversations from nested structure');
+                debugPrint('╚═══════════════════════════════════════╝');
+                return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+              }
 
-      debugPrint('⚠️ getUserConversations: unexpected type: ${decoded.runtimeType}');
+              debugPrint('║ ⚠️  Empty response - available keys: ${decoded.keys}');
+              debugPrint('╚═══════════════════════════════════════╝');
+              return [];
+            }
+
+      debugPrint('║ ⚠️  Unexpected response type: ${decoded.runtimeType}');
+      debugPrint('╚═══════════════════════════════════════╝');
       return [];
+
+    } on TimeoutException catch (e) {
+      debugPrint('╔═══════════════════════════════════════╗');
+      debugPrint('║ ⏱️ TIMEOUT EXCEPTION                  ║');
+      debugPrint('╠═══════════════════════════════════════╣');
+      debugPrint('║ Error: $e');
+      debugPrint('║ 💡 Suggestions:');
+      debugPrint('║   1. Check if backend is running');
+      debugPrint('║   2. Check network connection');
+      debugPrint('║   3. Verify backend URL is correct');
+      debugPrint('╚═══════════════════════════════════════╝');
+      return []; // ⬅️ Trả về empty list thay vì throw
+
+    } on SocketException catch (e) {
+      debugPrint('╔═══════════════════════════════════════╗');
+      debugPrint('║ 🌐 NETWORK ERROR                      ║');
+      debugPrint('╠═══════════════════════════════════════╣');
+      debugPrint('║ Cannot connect to backend');
+      debugPrint('║ Error: $e');
+      debugPrint('╚═══════════════════════════════════════╝');
+      return [];
+
     } catch (e, st) {
-      debugPrint('❌ Error fetching conversations: $e\n$st');
+      debugPrint('╔═══════════════════════════════════════╗');
+      debugPrint('║ ❌ UNEXPECTED ERROR                   ║');
+      debugPrint('╠═══════════════════════════════════════╣');
+      debugPrint('║ Error: $e');
+      debugPrint('║ Stack trace:');
+      debugPrint(st.toString().split('\n').take(3).map((line) => '║ $line').join('\n'));
+      debugPrint('╚═══════════════════════════════════════╝');
       return [];
     }
   }

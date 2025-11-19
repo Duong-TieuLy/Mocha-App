@@ -3,8 +3,6 @@ package com.userservice.controllers;
 import com.userservice.services.FollowService;
 import com.userservice.dtos.ApiResponse;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,13 +27,6 @@ public class FollowController {
         return ResponseEntity.ok(new ApiResponse(true, "Unfollowed successfully"));
     }
 
-    @DeleteMapping("/unfriend/{userId}")
-    public ResponseEntity<ApiResponse> unfriend(@PathVariable Long userId,
-                                                @RequestHeader("X-User-Id") String firebaseUid) {
-        followService.unfriend(firebaseUid, userId);
-        return ResponseEntity.ok(new ApiResponse(true, "Unfriended successfully"));
-    }
-
     @GetMapping("/check/{userId}")
     public ResponseEntity<Boolean> isFollowing(@PathVariable Long userId,
                                                @RequestHeader("X-User-Id") String firebaseUid) {
@@ -58,8 +49,15 @@ public class FollowController {
         return ResponseEntity.ok(followService.getFollowing(firebaseUid));
     }
 
+    @GetMapping("/friends")
+    public ResponseEntity<?> getFriends(@RequestHeader("X-User-Id") String firebaseUid) {
+        return ResponseEntity.ok(followService.getFriendList(firebaseUid));
+    }
+
     @GetMapping("/stats")
     public ResponseEntity<?> stats(@RequestHeader("X-User-Id") String firebaseUid) {
         return ResponseEntity.ok(followService.getFollowStats(firebaseUid));
     }
 }
+
+

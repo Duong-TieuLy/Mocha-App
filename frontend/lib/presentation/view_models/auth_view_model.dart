@@ -27,7 +27,35 @@ class AuthViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+  /// Signup
+  Future<void> signup({
+    required String email,
+    required String confirmPassword,
+    required String password,
+    required String displayName,
+  }) async {
+    isLoading = true;
+    errorMessage = null;
+    notifyListeners();
 
+    try {
+      currentUser = await _service.signup(
+        email: email,
+        password: password,
+        displayName: displayName,
+        confirmPassword: confirmPassword,
+      );
+
+      if (currentUser == null) {
+        errorMessage = "Signup successful but user is null.";
+      }
+    } catch (e) {
+      errorMessage = e.toString();
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
   /// 🔹 Logout
   Future<void> logout() async {
     await _service.logout();

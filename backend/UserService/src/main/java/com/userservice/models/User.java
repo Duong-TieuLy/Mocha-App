@@ -96,16 +96,4 @@ public class User {
     public int hashCode() {
         return 31;
     }
-
-    // ===========================================
-    //                FRIEND SYSTEM
-    // ===========================================
-
-//    @OneToMany(mappedBy = "user1")
-//    @JsonIgnore
-//    private List<Friend> sentFriendRequests = new ArrayList<>();
-//
-//    @OneToMany(mappedBy = "user2")
-//    @JsonIgnore
-//    private List<Friend> receivedFriendRequests = new ArrayList<>();
 }

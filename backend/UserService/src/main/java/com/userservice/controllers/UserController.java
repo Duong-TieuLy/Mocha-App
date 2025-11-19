@@ -7,11 +7,13 @@ import com.userservice.models.User;
 import com.userservice.services.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -24,7 +26,100 @@ public class UserController {
         this.service = service;
     }
 
-    // Tìm user theo email hoặc tên hiển thị
+    // ========================================
+    // 🆕 CHAT API ENDPOINTS
+    // ========================================
+
+    /**
+     * 🔥 GET /api/users/firebase/{firebaseUid}
+     * Lấy thông tin user theo Firebase UID (cho Chat Service)
+     */
+    @GetMapping("/firebase/{firebaseUid}")
+    public ResponseEntity<?> getUserByFirebaseUid(@PathVariable String firebaseUid) {
+        log.info("🔍 GET /api/users/firebase/{} — getting user for chat", firebaseUid);
+
+        try {
+            User user = service.findByFirebaseUid(firebaseUid)
+                    .orElseThrow(() -> new RuntimeException("User not found with firebaseUid: " + firebaseUid));
+
+            // Trả về full user object (bao gồm id, firebaseUid, fullName, photoUrl, etc.)
+            return ResponseEntity.ok(user);
+        } catch (Exception e) {
+            log.error("❌ Error getting user by firebaseUid: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * 🔥 GET /api/users/{userId}/following
+     * Lấy danh sách người mà user đang follow (bạn bè cho chat)
+     */
+    @GetMapping("/{userId}/following")
+    public ResponseEntity<?> getFollowing(@PathVariable Long userId) {
+        log.info("👥 GET /api/users/{}/following — getting friends list", userId);
+
+        try {
+            List<User> following = service.getFollowing(userId);
+
+            // Convert to simple DTO for chat
+            List<Map<String, Object>> result = following.stream()
+                    .map(user -> Map.of(
+                            "id", user.getId(),
+                            "firebaseUid", user.getFirebaseUid(),
+                            "fullName", user.getFullName() != null ? user.getFullName() : "",
+                            "username", user.getUsername() != null ? user.getUsername() : "",
+                            "email", user.getEmail() != null ? user.getEmail() : "",
+                            "photoUrl", user.getPhotoUrl() != null ? user.getPhotoUrl() : "",
+                            "status", user.getStatus() != null ?
+                                    Map.of("status", user.getStatus().getStatus()) :
+                                    Map.of("status", "offline")
+                    ))
+                    .collect(Collectors.toList());
+
+            log.info("✅ Found {} following users for userId={}", result.size(), userId);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("❌ Error getting following list: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * 🔥 GET /api/users/{userId}/followers
+     * Lấy danh sách người đang follow user này
+     */
+    @GetMapping("/{userId}/followers")
+    public ResponseEntity<?> getFollowers(@PathVariable Long userId) {
+        log.info("👥 GET /api/users/{}/followers — getting followers list", userId);
+
+        try {
+            List<User> followers = service.getFollowers(userId);
+
+            List<Map<String, Object>> result = followers.stream()
+                    .map(user -> Map.of(
+                            "id", user.getId(),
+                            "firebaseUid", user.getFirebaseUid(),
+                            "fullName", user.getFullName() != null ? user.getFullName() : "",
+                            "username", user.getUsername() != null ? user.getUsername() : "",
+                            "photoUrl", user.getPhotoUrl() != null ? user.getPhotoUrl() : ""
+                    ))
+                    .collect(Collectors.toList());
+
+            log.info("✅ Found {} followers for userId={}", result.size(), userId);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("❌ Error getting followers list: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // ========================================
+    // EXISTING ENDPOINTS (KEEP AS IS)
+    // ========================================
+
     @GetMapping("/search")
     public ResponseEntity<List<UserProfileDto>> searchUsers(
             @RequestHeader("X-User-Id") String uid,
@@ -37,7 +132,7 @@ public class UserController {
             return ResponseEntity.badRequest().build();
         }
 
-        List<User> users = service.searchUsers(keyword, uid); // truyền uid để loại bỏ bản thân
+        List<User> users = service.searchUsers(keyword, uid);
 
         List<UserProfileDto> result = users.stream()
                 .map(UserMapper::toProfileDto)
@@ -46,7 +141,6 @@ public class UserController {
         log.info("✅ Found {} users matching keyword: {}", result.size(), keyword);
         return ResponseEntity.ok(result);
     }
-
 
     @GetMapping("/me")
     public ResponseEntity<UserProfileDto> getMyProfile(
@@ -76,9 +170,6 @@ public class UserController {
         return ResponseEntity.ok(dto);
     }
 
-    /**
-     * 🔹 Lấy thông tin hồ sơ gọn (dành cho frontend hiển thị)
-     */
     @GetMapping("/profile")
     public ResponseEntity<UserProfileDto> getCompactProfile(@RequestHeader("X-User-Id") String uid) {
         log.info("📥 GET /api/users/profile — uid={}", uid);
@@ -101,10 +192,6 @@ public class UserController {
         }
     }
 
-
-    /**
-     * 🔹 Cập nhật hồ sơ người dùng
-     */
     @PutMapping("/me")
     public ResponseEntity<User> updateProfile(
             @RequestHeader("X-User-Id") String uid,
@@ -114,9 +201,6 @@ public class UserController {
         return ResponseEntity.ok(saved);
     }
 
-    /**
-     * 🔹 Đồng bộ user từ AuthService
-     */
     @PostMapping("/sync")
     public ResponseEntity<User> syncUser(@RequestBody UserSyncDto dto) {
         log.info("🔄 POST /api/users/sync — data={}", dto);
