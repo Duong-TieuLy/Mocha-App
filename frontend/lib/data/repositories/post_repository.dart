@@ -7,8 +7,8 @@ class PostRepository {
 
   PostRepository({required this.postService});
 
-  Future<List<Post>> getPosts(String uid) async {
-    return await postService.fetchPosts(uid);
+  Future<List<Post>> getAllPosts() async {
+    return await postService.fetchAllPosts();
   }
 
   Future<Post> addPost(Post post) async {

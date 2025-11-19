@@ -125,7 +125,12 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
             create: (_) => PostViewModel(
                 repository: PostRepository(
-                postService: PostService(baseUrl: 'http://10.0.2.2:8000'))))
+                postService: PostService(baseUrl: 'http://10.0.2.2:8084')),
+                userVM: UserViewModel(repository: UserRepository(
+    userService:
+    UserService(baseUrl: 'http://10.0.2.2:8000')))
+            )
+        )
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

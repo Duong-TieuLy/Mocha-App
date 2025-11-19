@@ -8,15 +8,16 @@ class PostService {
 
   PostService({required this.baseUrl});
 
-  Future<List<Post>> fetchPosts(String firebaseUid) async {
+  Future<List<Post>> fetchAllPosts() async {
     final token = await AuthService().getToken();
     final response = await http.get(
-      Uri.parse('$baseUrl/api/posts'),
+      Uri.parse('http://10.0.2.2:8084/api/posts'),
       headers: {
         'Authorization': 'Bearer $token',
       },
     );
-
+    print(response.statusCode);
+    print(response.body);
     if (response.statusCode == 200) {
       final List data = json.decode(response.body);
       return data.map((json) => Post.fromJson(json)).toList();

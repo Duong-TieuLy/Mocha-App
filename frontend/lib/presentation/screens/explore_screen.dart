@@ -2,7 +2,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:frontend/presentation/screens/post_card.dart';
+import 'package:frontend/presentation/screens/stories_section.dart';
 import 'package:provider/provider.dart';
+import '../view_models/profile_view_model.dart';
 import '../view_models/user_view_model.dart';
 import 'post_dialog.dart';
 
@@ -59,7 +62,16 @@ class _ExplorePageState extends State<ExplorePage> {
   void initState() {
     super.initState();
     _loadMorePosts(); // load trang đầu tiê
-    _loadFollowing();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadFollowing();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final postVM = Provider.of<PostViewModel>(context, listen: false);
+      print("Start loading posts...");
+      await postVM.loadAllPosts(); // Bắt buộc await để chắc chắn thực thi
+      print("Posts loaded: ${postVM.posts.length}");
+    });
+
     _scrollController.addListener(() {
       // Ẩn/hiện FAB
       setState(() {
@@ -86,7 +98,7 @@ class _ExplorePageState extends State<ExplorePage> {
       if (currentUser == null) return;
 
       final followingList = await userViewModel.loadFollowing(currentUser.uid);
-      print(followingList);
+
       setState(() {
         _followingUsers = followingList;
         _isLoadingStories = false;
@@ -186,82 +198,31 @@ class _ExplorePageState extends State<ExplorePage> {
           ),
         ],
       ),
-      body: ListView.builder(
-        controller: _scrollController,
-        itemCount: _posts.length + 2, // +1 cho Stories, +1 cho loading
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            // Stories Section
-            return SizedBox(
-              height: 105,
-              child: _isLoadingStories
-                  ? const Center(child: CircularProgressIndicator())
-                  : ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                itemCount: _followingUsers.length,
-                itemBuilder: (context, i) {
-                  final user = _followingUsers[i];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Column(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(2.5),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: const LinearGradient(
-                              colors: [Colors.blue, Colors.lightBlueAccent],
-                            ),
-                          ),
-                          child: CircleAvatar(
-                            radius: 28,
-                            backgroundImage: NetworkImage(
-                              user['photoUrl'] ?? 'https://via.placeholder.com/150',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          user['fullName'] ?? 'No Name',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            );
-          }
+      body: Consumer<PostViewModel>(
+        builder: (context, postVM, child) {
+          if (postVM.isLoading) return const Center(child: CircularProgressIndicator());
 
-          if (index <= _posts.length) {
-            // Post Card
-            final post = _posts[index - 1];
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: _buildPostCard(
-                key: ValueKey(post['image']),
-                name: post['name'],
-                username: post['username'],
-                image: post['image'],
-                caption: post['caption'],
-                likes: post['likes'],
-                comments: post['comments'],
-              ),
-            );
-          }
+          return ListView.builder(
+            controller: _scrollController,
+            itemCount: postVM.posts.length + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) return StoriesSection(
+                isLoading: _isLoadingStories,
+                followingUsers: _followingUsers,
+              );
 
-          // Loading indicator cuối ListView
-          return _isLoadingMore
-              ? const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Center(child: CircularProgressIndicator()),
-          )
-              : const SizedBox.shrink();
+              final post = postVM.posts[index - 1];
+              final profile = postVM.userProfiles[post.firebaseUid];
+
+              return PostCard(
+                name: profile?.fullName ?? 'Unknown',
+                username: profile?.firebaseUid ?? '',
+                image: post.images,
+                caption: post.content,
+                likes: post.likeCount,
+              );
+            },
+          );
         },
       ),
       floatingActionButton: AnimatedOpacity(
@@ -277,93 +238,6 @@ class _ExplorePageState extends State<ExplorePage> {
           backgroundColor: Colors.blue,
           child: const Icon(Icons.add, color: Colors.white),
         ),
-      ),
-    );
-  }
-
-  Widget _buildPostCard({
-    required Key key,
-    required String name,
-    required String username,
-    required String image,
-    required String caption,
-    required int likes,
-    required int comments,
-  }) {
-    return Container(
-      key: key,
-      margin: const EdgeInsets.only(bottom: 12, top: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFD8E8FF),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const CircleAvatar(
-                radius: 20,
-                backgroundImage: NetworkImage(
-                    "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde"),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
-                      color: Colors.black,
-                    ),
-                  ),
-                  Text(
-                    username,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
-              ),
-              const Spacer(),
-              const Icon(Icons.more_horiz, color: Colors.grey),
-            ],
-          ),
-          const SizedBox(height: 10),
-          // Caption
-          Text(
-            caption,
-            style: const TextStyle(fontSize: 14, color: Colors.black),
-          ),
-          const SizedBox(height: 10),
-          // Image
-          ClipRRect(
-            borderRadius: BorderRadius.circular(15),
-            child: image.startsWith('http')
-                ? CachedNetworkImage(
-              imageUrl: image,
-              height: 200,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              placeholder: (context, url) =>
-              const Center(child: CircularProgressIndicator()),
-              errorWidget: (context, url, error) =>
-              const Center(child: Icon(Icons.error, color: Colors.red)),
-            )
-                : Image.file(
-                  File(image),
-                  height: 200,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                 ),
-          ),
-        ],
       ),
     );
   }

@@ -16,19 +16,23 @@ class Post {
   });
 
   factory Post.fromJson(Map<String, dynamic> json) {
+    final postData = json['post'] ?? json;
+
     return Post(
-      id: json['id'] ?? 0,
-      firebaseUid: json['firebaseUid'] ?? '',
-      content: json['content'] ?? '',
-      images: json['images'],
-      likeCount: json['likeCount'] ?? 0,
-      createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
+      id: postData['id'] ?? 0,
+      firebaseUid: postData['firebaseUid'] ?? '',
+      content: postData['content'] ?? '',
+      images: postData['images'],
+      likeCount: postData['likeCount'] ?? 0,
+      createdAt: DateTime.tryParse(postData['createdAt'] ?? '') ?? DateTime.now(),
     );
   }
 
   Map<String, dynamic> toJson() => {
-    "firebaseUid": firebaseUid,
-    "content": content,
-    "images": images,
+    'id': id,
+    'firebaseUid': firebaseUid,
+    'image': images,
+    'caption': content,
+    'likes': likeCount
   };
 }

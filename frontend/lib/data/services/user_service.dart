@@ -156,6 +156,7 @@ class UserService {
 
   Future<List<dynamic>> getFollowing(String uid) async {
     final token = await AuthService().getToken();
+    print('Token: $token');
 
     final response = await http.get(
       Uri.parse('$baseUrl/api/users/follow/following'),
@@ -164,8 +165,25 @@ class UserService {
         'Authorization': 'Bearer $token',
       },
     );
-    print(response.body);
-    return json.decode(response.body);
-  }
+    print('Response status code: ${response.statusCode}');
+    print('Response body: ${response.body}');
 
+    if (response.body.isEmpty) {
+      // Trả về list rỗng nếu server trả về rỗng
+      return [];
+    }
+
+    try {
+      final data = json.decode(response.body);
+      if (data is List) {
+        return data;
+      } else {
+        // Nếu server trả về object khác
+        return [];
+      }
+    } catch (e) {
+      print('Error parsing JSON: $e');
+      return [];
+    }
+  }
 }
