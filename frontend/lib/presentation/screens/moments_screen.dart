@@ -1,7 +1,13 @@
+import 'dart:io';
+
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:frontend/presentation/screens/post_card.dart';
+import '../../data/services/auth_service.dart';
+import '../view_models/moment_view_model.dart';
 import 'search_screen.dart';
+import 'package:provider/provider.dart';
+
 
 class MomentsPage extends StatefulWidget {
   const MomentsPage({super.key});
@@ -39,6 +45,24 @@ class _MomentsPageState extends State<MomentsPage> {
     }
   }
 
+  // Future<void> _takePictureAndUpload() async {
+  //   if (_cameraController == null || !_cameraController!.value.isInitialized) return;
+  //
+  //   try {
+  //     final picture = await _cameraController!.takePicture();
+  //     final file = File(picture.path);
+  //     final firebaseUid = await AuthService().getUid();
+  //
+  //     // Dùng Provider.of thay vì context.read
+  //     final momentViewModel = Provider.of<MomentViewModel>(context, listen: false);
+  //     await momentViewModel.takeAndUploadMoment(file, firebaseUid!);
+  //
+  //   } catch (e) {
+  //     print("❌ Lỗi chụp/upload ảnh: $e");
+  //   }
+  // }
+
+  
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;

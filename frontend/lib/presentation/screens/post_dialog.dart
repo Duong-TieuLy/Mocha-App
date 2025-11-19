@@ -5,6 +5,7 @@ import 'dart:io';
 
 import '../../data/models/post_model.dart';
 import '../../data/services/post_service.dart';
+import '../../main.dart';
 import '../view_models/auth_view_model.dart';
 import '../view_models/post_view_model.dart';
 

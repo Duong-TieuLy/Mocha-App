@@ -41,8 +41,10 @@ dependencies:
   firebase_messaging: ^16.0.4
   flutter_local_notifications: ^17.1.0
   firebase_auth: ^6.1.2
+  cloudinary_flutter: ^1.0.0
   http: ^1.1.0
   provider: ^6.0.0
+  path: ^1.8.3
   stomp_dart_client: ^0.4.4
   flutter_secure_storage: ^8.1.0
   image_picker: ^1.1.1

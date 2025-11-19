@@ -1,12 +1,15 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:frontend/presentation/view_models/moment_view_model.dart';
 import 'package:frontend/presentation/view_models/post_view_model.dart';
 import 'package:frontend/presentation/view_models/user_view_model.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'data/repositories/moment_repository.dart';
 import 'data/repositories/post_repository.dart';
 import 'data/repositories/user_repository.dart';
+import 'data/services/moment_service.dart';
 import 'data/services/post_service.dart';
 import 'data/services/user_service.dart';
 import 'firebase_options.dart';
@@ -125,7 +128,14 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
             create: (_) => PostViewModel(
                 repository: PostRepository(
-                postService: PostService(baseUrl: 'http://10.0.2.2:8000'))))
+                postService: PostService(baseUrl: 'http://10.0.2.2:8000')))),
+      //   ChangeNotifierProvider(
+      //     create: (_) => MomentViewModel(
+      //       repository: MomentRepository(
+      //         momentService: MomentService(baseUrl: 'http://10.0.2.2:8000')
+      //       ),
+      //     ),
+      //   ),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
