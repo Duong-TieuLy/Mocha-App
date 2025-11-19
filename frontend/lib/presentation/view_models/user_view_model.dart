@@ -15,6 +15,11 @@ class UserViewModel extends ChangeNotifier {
   UserProfile? get profile => _profile;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  /// ==========================
+  /// LOAD FOLLOWING
+  /// ==========================
+  List<Map<String, dynamic>> following = [];
+  bool isLoadingFollowing = false;
 
   /// FOLLOW STATE CHO USER ĐANG XEM
   /// Map<userId, bool>
@@ -129,6 +134,27 @@ class UserViewModel extends ChangeNotifier {
 
     if (success) {
       _followingCache[targetUserId] = false;
+      notifyListeners();
+    }
+  }
+  Future<List<Map<String, dynamic>>> loadFollowing(String uid) async {
+    try {
+      isLoadingFollowing = true;
+      notifyListeners();
+
+      final response = await repository.getFollowing(uid);
+
+      following = response
+          .map((e) => e as Map<String, dynamic>)
+          .toList();
+
+      return following; // 👈 Trả danh sách
+    } catch (e) {
+      print('Error loadFollowing: $e');
+      following = [];
+      return [];
+    } finally {
+      isLoadingFollowing = false;
       notifyListeners();
     }
   }

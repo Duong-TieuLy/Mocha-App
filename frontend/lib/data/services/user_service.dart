@@ -164,7 +164,7 @@ class UserService {
         'Authorization': 'Bearer $token',
       },
     );
-
+    print(response.body);
     return json.decode(response.body);
   }
 

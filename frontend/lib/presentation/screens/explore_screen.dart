@@ -1,6 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
+import '../view_models/user_view_model.dart';
 import 'post_dialog.dart';
 
 class ExplorePage extends StatefulWidget {
@@ -11,6 +14,8 @@ class ExplorePage extends StatefulWidget {
 }
 
 class _ExplorePageState extends State<ExplorePage> {
+  List<Map<String, dynamic>> _followingUsers = [];
+  bool _isLoadingStories = true;
   // Giả lập dữ liệu server
   List<Map<String, dynamic>> _allPosts = [
     {
@@ -53,8 +58,8 @@ class _ExplorePageState extends State<ExplorePage> {
   @override
   void initState() {
     super.initState();
-    _loadMorePosts(); // load trang đầu tiên
-
+    _loadMorePosts(); // load trang đầu tiê
+    _loadFollowing();
     _scrollController.addListener(() {
       // Ẩn/hiện FAB
       setState(() {
@@ -74,7 +79,23 @@ class _ExplorePageState extends State<ExplorePage> {
       }
     });
   }
+  Future<void> _loadFollowing() async {
+    try {
+      final userViewModel = Provider.of<UserViewModel>(context, listen: false);
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
 
+      final followingList = await userViewModel.loadFollowing(currentUser.uid);
+      print(followingList);
+      setState(() {
+        _followingUsers = followingList;
+        _isLoadingStories = false;
+      });
+    } catch (e) {
+      print('Error loading following users: $e');
+      setState(() => _isLoadingStories = false);
+    }
+  }
   // Load thêm post theo trang
   void _loadMorePosts() async {
     if (_currentPage * _pageSize >= _allPosts.length) return;
@@ -173,11 +194,14 @@ class _ExplorePageState extends State<ExplorePage> {
             // Stories Section
             return SizedBox(
               height: 105,
-              child: ListView.builder(
+              child: _isLoadingStories
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView.builder(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                itemCount: names.length,
+                itemCount: _followingUsers.length,
                 itemBuilder: (context, i) {
+                  final user = _followingUsers[i];
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 6),
                     child: Column(
@@ -192,12 +216,14 @@ class _ExplorePageState extends State<ExplorePage> {
                           ),
                           child: CircleAvatar(
                             radius: 28,
-                            backgroundImage: NetworkImage(images[i]),
+                            backgroundImage: NetworkImage(
+                              user['photoUrl'] ?? 'https://via.placeholder.com/150',
+                            ),
                           ),
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          names[i],
+                          user['fullName'] ?? 'No Name',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
