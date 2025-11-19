@@ -40,6 +40,22 @@
       "DownstreamHeaderTransform": {
         "Authorization": "{Authorization}"
       }
+    },
+    {
+      "DownstreamPathTemplate": "/api/moments/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        { "Host": "momentservice", "Port": 8085 }
+      ],
+      "UpstreamPathTemplate": "/api/moments/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ],
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      },
+      "DownstreamHeaderTransform": {
+        "Authorization": "{Authorization}"
+      }
     }
   ],
   "GlobalConfiguration": {

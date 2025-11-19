@@ -1,6 +1,7 @@
 package com.postservice.controllers;
 
 import com.postservice.dtos.PostRequest;
+import com.postservice.dtos.PostResponseDTO;
 import com.postservice.models.Post;
 import com.postservice.services.PostService;
 import com.postservice.services.ReactionService;
@@ -20,26 +21,18 @@ public class PostController {
     private final ReactionService reactionService;
 
     @GetMapping
-    public ResponseEntity<?> getAllPosts() {
-        List<Post> posts = postService.getAllPosts();
-        List<Map<String, Object>> result = new ArrayList<>();
-
-        for (Post p : posts) {
-            Map<String, Object> postMap = new HashMap<>();
-            postMap.put("post", p);
-            postMap.put("reactions", reactionService.countReactionsByPost(p.getId()));
-            result.add(postMap);
+    public ResponseEntity<List<PostResponseDTO>> getPosts(
+            @RequestParam(required = false) String firebaseUid,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        List<PostResponseDTO> posts;
+        if (firebaseUid != null && !firebaseUid.isEmpty()) {
+            posts = postService.getPostsByUser(firebaseUid, page, size);
+        } else {
+            posts = postService.getAllPosts(page, size);
         }
-        return ResponseEntity.ok(result);
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<?> getPost(@PathVariable Long id) {
-        Post post = postService.getPostById(id);
-        Map<String, Object> response = new HashMap<>();
-        response.put("post", post);
-        response.put("reactions", reactionService.countReactionsByPost(id));
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(posts);
     }
 
     @PostMapping
@@ -57,4 +50,5 @@ public class PostController {
         postService.deletePost(id);
         return ResponseEntity.ok("Deleted successfully");
     }
+
 }

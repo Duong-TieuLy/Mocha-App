@@ -1,4 +1,4 @@
-package com.userservice.dtos;
+package com.mocha.momentservice.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

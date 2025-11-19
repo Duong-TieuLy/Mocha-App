@@ -128,6 +128,7 @@ public class UserService {
                 .map(UserMapper::toProfileDto)
                 .orElse(null);
     }
+
     /**
      * Đồng bộ user từ AuthService → UserService
      * Nếu user chưa tồn tại thì tạo mới chỉ với firebaseUid

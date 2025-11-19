@@ -160,6 +160,7 @@ public class FollowService {
                 .map(f -> f.getOtherUser(currentUser.getId())) // lấy người bạn còn lại
                 .filter(Objects::nonNull)
                 .map(user -> new FriendInfoDto(
+                        user.getId(),
                         user.getFirebaseUid(),
                         user.getFullName(),
                         user.getPhotoUrl(),

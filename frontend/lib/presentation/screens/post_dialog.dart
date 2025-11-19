@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import 'dart:io';
 
 import '../../data/models/post_model.dart';
 import '../../data/services/post_service.dart';
+import '../view_models/auth_view_model.dart';
+import '../view_models/post_view_model.dart';
 
 // Widget riêng cho dialog đăng post
 class PostDialog extends StatefulWidget {
@@ -33,26 +36,34 @@ class _PostDialogState extends State<PostDialog> {
 
   // Hàm đăng post
   void _post() async {
-    if (_captionController.text.isNotEmpty || _selectedImage != null) {
-      // Tạo post mới với Map
-      final newPost = {
-        'name': "You", // Giả lập tên người dùng hiện tại
-        'username': "@YourUsername", // Giả lập username
-        'image': _selectedImage?.path ?? "https://via.placeholder.com/300", // Nếu không có ảnh, dùng placeholder
-        'caption': _captionController.text.isNotEmpty ? _captionController.text : "Không có caption",
-        'likes': 0, // Bắt đầu với 0 like
-        'comments': 0, // Bắt đầu với 0 comment
-      };
-      final Post post = Post.fromJson(newPost);
-      // Gọi callback để cập nhật danh sách posts trong ExplorePage
-      widget.onPostCreated(newPost);
-      await PostService(baseUrl: 'http://10.0.2.2:8000').createPost(post);
-      // Reset form
-      _captionController.clear();
-      setState(() {
-        _selectedImage = null;
-      });
-      Navigator.of(context).pop(); // Đóng dialog
+    final postVm = Provider.of<PostViewModel>(context, listen: false);
+    final authVm = Provider.of<AuthViewModel>(context, listen: false);
+
+    final uid = authVm.currentUser?.uid;
+    if (uid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("User not logged in")),
+      );
+      return;
+    }
+
+    final newPost = Post(
+      firebaseUid: uid,
+      content: _captionController.text,
+      images: _selectedImage?.path,
+      likeCount: 0,
+      createdAt: DateTime.now(),
+    );
+
+    final createdPost = await postVm.createPost(newPost);
+
+    if (createdPost != null) {
+      widget.onPostCreated(createdPost.toJson());
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to create post")),
+      );
     }
   }
 

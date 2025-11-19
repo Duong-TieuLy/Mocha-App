@@ -220,6 +220,28 @@ services:
       - mocha-network
     restart: on-failure
 
+  momentservice:
+    build:
+      context: ./backend/MomentService
+      dockerfile: Dockerfile
+    container_name: momentservice
+    ports:
+      - "8085:8085"
+    environment:
+      USER_SERVICE_BASE_URL: http://userservice:8082/api/users
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/MomentDB
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: YourStrong@Password123
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SERVER_PORT: 8085
+      SPRING_APPLICATION_NAME: MomentService
+    depends_on:
+      - db
+      - userservice
+    networks:
+      - mocha-network
+    restart: on-failure  # ← Tự động restart nếu fail
+
   # ========================================
   # API GATEWAY
   # ========================================

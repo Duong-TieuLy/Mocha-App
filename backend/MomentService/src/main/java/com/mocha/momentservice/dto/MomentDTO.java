@@ -10,7 +10,7 @@ import java.util.List;
 @Builder
 public class MomentDTO {
     private Long id;
-    private Long userId;
+    private String firebaseUid;
     private String imageUrl;
     private String caption;
     private LocalDateTime createdAt;

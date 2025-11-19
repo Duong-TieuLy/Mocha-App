@@ -8,7 +8,6 @@ import java.util.Set;
 
 @Entity
 @Table(name = "moments", indexes = {
-        @Index(name = "idx_user_id", columnList = "user_id"),
         @Index(name = "idx_created_at", columnList = "created_at")
 })
 @Data
@@ -20,8 +19,8 @@ public class Moment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "firebase_uid", nullable = false, length = 128)
+    private String firebaseUid;
 
     @Column(name = "image_url", nullable = false, length = 500)
     private String imageUrl;
@@ -31,6 +30,9 @@ public class Moment {
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "allowed_uids", columnDefinition = "TEXT")
+    private String allowedUids;
 
     @OneToMany(mappedBy = "moment", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private Set<Reaction> reactions = new HashSet<>();

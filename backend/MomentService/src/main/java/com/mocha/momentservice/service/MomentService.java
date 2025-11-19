@@ -2,10 +2,17 @@ package com.mocha.momentservice.service;
 
 import com.mocha.momentservice.model.Moment;
 import com.mocha.momentservice.repository.MomentRepository;
+import com.mocha.momentservice.rest.UserClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.stream.Collectors;
+
+import java.util.Arrays;
 import java.util.List;
 
 @Service
@@ -13,31 +20,57 @@ import java.util.List;
 public class MomentService {
 
     private final MomentRepository momentRepository;
+    private final UserClient userClient;
 
-    // Tạo moment mới
-    public Moment createMoment(Moment moment) {
+    public Moment createMoment(String firebaseUid, String imageUrl, String caption, List<String> allowedUids) {
+        if (allowedUids == null || allowedUids.isEmpty()) {
+            allowedUids = userClient.getFriendFirebaseUids(firebaseUid);
+        }
+
+        Moment moment = Moment.builder()
+                .firebaseUid(firebaseUid)
+                .imageUrl(imageUrl)
+                .caption(caption)
+                .allowedUids(!allowedUids.isEmpty() ? String.join(",", allowedUids) : null)
+                .build();
         return momentRepository.save(moment);
     }
 
-    // Lấy feed của bạn bè
-    public Page<Moment> getFeed(List<Long> friendIds, Pageable pageable) {
-        return momentRepository.findByUserIdIn(friendIds, pageable);
+    /**
+     * Feed chỉ hiển thị moments của bạn bè + được phép xem
+     */
+    public Page<Moment> getFeed(String firebaseUid, Pageable pageable) {
+        List<String> friendUids = new ArrayList<>(userClient.getFriendFirebaseUids(firebaseUid));
+        friendUids.add(firebaseUid); // bao gồm chính user
+
+        Page<Moment> allMoments = momentRepository.findByFirebaseUidInOrderByCreatedAtDesc(friendUids, pageable);
+
+        List<Moment> filtered = allMoments.getContent().stream()
+                .filter(moment -> {
+                    if (moment.getAllowedUids() == null || moment.getAllowedUids().isEmpty()) {
+                        return true;
+                    }
+                    List<String> allowed = Arrays.asList(moment.getAllowedUids().split(","));
+                    return allowed.contains(firebaseUid);
+                })
+                .collect(Collectors.toList());
+
+        return new PageImpl<>(filtered, pageable, allMoments.getTotalElements());
     }
 
-    // Lấy moments của 1 user
-    public Page<Moment> getUserMoments(Long userId, Pageable pageable) {
-        return momentRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
+    public Page<Moment> getUserMoments(String firebaseUid, Pageable pageable) {
+        return momentRepository.findByFirebaseUidOrderByCreatedAtDesc(firebaseUid, pageable);
     }
 
-    // Xóa moment
-    public void deleteMoment(Long momentId, Long userId) {
-        momentRepository.deleteByIdAndUserId(momentId, userId);
-    }
+    public void deleteMoment(String firebaseUid, Long momentId) {
+        Moment moment = momentRepository.findById(momentId)
+                .orElseThrow(() -> new IllegalArgumentException("Moment not found"));
 
-    // Thống kê
-    public Long countMoments(Long userId) {
-        return momentRepository.countByUserId(userId);
-    }
+        // Chỉ cho phép chủ sở hữu xóa
+        if (!moment.getFirebaseUid().equals(firebaseUid)) {
+            throw new SecurityException("You are not allowed to delete this moment");
+        }
 
+        momentRepository.delete(moment);
+    }
 }
-

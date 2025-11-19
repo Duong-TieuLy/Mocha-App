@@ -1,6 +1,11 @@
-import 'package:flutter/material.dart';
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
+
+import '../../data/models/post_model.dart';
+import '../view_models/auth_view_model.dart';
+import '../view_models/post_view_model.dart';
 import 'post_dialog.dart';
 
 class ExplorePage extends StatefulWidget {
@@ -11,36 +16,13 @@ class ExplorePage extends StatefulWidget {
 }
 
 class _ExplorePageState extends State<ExplorePage> {
-  // Giả lập dữ liệu server
-  List<Map<String, dynamic>> _allPosts = [
-    {
-      'name': "Dipprokash Sardar",
-      'username': "@Kolkata",
-      'image': "https://images.unsplash.com/photo-1501785888041-af3ef285b470",
-      'caption': "Một ngày đẹp trời ở Kolkata!",
-      'likes': 7500,
-      'comments': 425,
-    },
-    {
-      'name': "Dipprokash Sardar",
-      'username': "@Kolkata",
-      'image': "https://images.unsplash.com/photo-1507525428034-b723cf961d3e",
-      'caption': "Biển xanh ngát, thư giãn tuyệt vời.",
-      'likes': 6500,
-      'comments': 320,
-    },
-    // Bạn có thể thêm nhiều post khác
-  ];
+  late PostViewModel postVm;
+  late String currentUid;
 
-  List<Map<String, dynamic>> _posts = []; // Danh sách posts đang hiển thị
   final ScrollController _scrollController = ScrollController();
   double _fabOpacity = 1.0;
-  bool _isRefreshing = false;
-  bool _isLoadingMore = false;
 
-  final int _pageSize = 2; // số bài load mỗi lần
-  int _currentPage = 0;
-
+  // Stories giả lập
   final List<String> names = ["You", "Bella", "Emma", "Aron", "Milan"];
   final List<String> images = [
     "https://cdn3d.iconscout.com/3d/premium/thumb/young-man-5689575-4758544.png",
@@ -53,64 +35,38 @@ class _ExplorePageState extends State<ExplorePage> {
   @override
   void initState() {
     super.initState();
-    _loadMorePosts(); // load trang đầu tiên
+    postVm = Provider.of<PostViewModel>(context, listen: false);
+    currentUid = Provider.of<AuthViewModel>(context, listen: false).currentUser!.uid;
 
+    // Load page đầu tiên
+    postVm.loadPosts(currentUid);
+
+    // Listener scroll
     _scrollController.addListener(() {
-      // Ẩn/hiện FAB
       setState(() {
         _fabOpacity = _scrollController.offset > 0 ? 0.0 : 1.0;
       });
 
-      // Pull-to-refresh
-      if (_scrollController.offset <= 0 && !_isRefreshing) {
-        _refreshPage();
-      }
-
-      // Infinite scroll khi scroll gần cuối
+      // Lazy load khi scroll gần cuối
       if (_scrollController.position.pixels >=
           _scrollController.position.maxScrollExtent - 200 &&
-          !_isLoadingMore) {
-        _loadMorePosts();
+          !postVm.isLoading &&
+          postVm.hasMore) {
+        postVm.loadPosts(currentUid);
       }
     });
-  }
-
-  // Load thêm post theo trang
-  void _loadMorePosts() async {
-    if (_currentPage * _pageSize >= _allPosts.length) return;
-    _isLoadingMore = true;
-
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    int start = _currentPage * _pageSize;
-    int end = start + _pageSize;
-    if (end > _allPosts.length) end = _allPosts.length;
-
-    setState(() {
-      _posts.addAll(_allPosts.sublist(start, end));
-      _currentPage++;
-    });
-
-    _isLoadingMore = false;
   }
 
   // Pull-to-refresh
   Future<void> _refreshPage() async {
-    _isRefreshing = true;
-    await Future.delayed(const Duration(milliseconds: 500));
-    setState(() {
-      _posts.clear();
-      _currentPage = 0;
-    });
-    _loadMorePosts();
-    _isRefreshing = false;
+    await postVm.loadPosts(currentUid, refresh: true);
   }
 
   // Thêm post mới từ dialog
-  void _addNewPost(Map<String, dynamic> newPost) {
+  void _addNewPost(Map<String, dynamic> newPostJson) {
+    final newPost = Post.fromJson(newPostJson);
     setState(() {
-      _posts.insert(0, newPost);
-      _allPosts.insert(0, newPost);
+      postVm.posts.insert(0, newPost);
     });
   }
 
@@ -125,18 +81,14 @@ class _ExplorePageState extends State<ExplorePage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        title: const Text(
+          "Explore",
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.black),
+        ),
         backgroundColor: Colors.white,
         elevation: 0,
         automaticallyImplyLeading: false,
         centerTitle: true,
-        title: const Text(
-          "Explore",
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: Colors.black,
-          ),
-        ),
         leading: Padding(
           padding: const EdgeInsets.only(left: 12),
           child: CircleAvatar(
@@ -165,78 +117,43 @@ class _ExplorePageState extends State<ExplorePage> {
           ),
         ],
       ),
-      body: ListView.builder(
-        controller: _scrollController,
-        itemCount: _posts.length + 2, // +1 cho Stories, +1 cho loading
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            // Stories Section
-            return SizedBox(
-              height: 105,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                itemCount: names.length,
-                itemBuilder: (context, i) {
+      body: RefreshIndicator(
+        onRefresh: _refreshPage,
+        child: Consumer<PostViewModel>(
+          builder: (context, vm, child) {
+            if (vm.isLoading && vm.posts.isEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (vm.error != null && vm.posts.isEmpty) {
+              return Center(child: Text("Error: ${vm.error}"));
+            }
+
+            return ListView.builder(
+              controller: _scrollController,
+              itemCount: vm.posts.length + 2, // +1 stories, +1 loading indicator
+              itemBuilder: (context, index) {
+                if (index == 0) return _buildStoriesSection();
+
+                if (index <= vm.posts.length) {
+                  final post = vm.posts[index - 1];
                   return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Column(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(2.5),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: const LinearGradient(
-                              colors: [Colors.blue, Colors.lightBlueAccent],
-                            ),
-                          ),
-                          child: CircleAvatar(
-                            radius: 28,
-                            backgroundImage: NetworkImage(images[i]),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          names[i],
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ],
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: _buildPostCard(post),
                   );
-                },
-              ),
-            );
-          }
+                }
 
-          if (index <= _posts.length) {
-            // Post Card
-            final post = _posts[index - 1];
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: _buildPostCard(
-                key: ValueKey(post['image']),
-                name: post['name'],
-                username: post['username'],
-                image: post['image'],
-                caption: post['caption'],
-                likes: post['likes'],
-                comments: post['comments'],
-              ),
+                // Loading indicator cuối
+                return vm.isLoading
+                    ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+                    : const SizedBox.shrink();
+              },
             );
-          }
-
-          // Loading indicator cuối ListView
-          return _isLoadingMore
-              ? const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Center(child: CircularProgressIndicator()),
-          )
-              : const SizedBox.shrink();
-        },
+          },
+        ),
       ),
       floatingActionButton: AnimatedOpacity(
         opacity: _fabOpacity,
@@ -255,17 +172,47 @@ class _ExplorePageState extends State<ExplorePage> {
     );
   }
 
-  Widget _buildPostCard({
-    required Key key,
-    required String name,
-    required String username,
-    required String image,
-    required String caption,
-    required int likes,
-    required int comments,
-  }) {
+  Widget _buildStoriesSection() {
+    return SizedBox(
+      height: 105,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: names.length,
+        itemBuilder: (context, i) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(2.5),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [Colors.blue, Colors.lightBlueAccent],
+                    ),
+                  ),
+                  child: CircleAvatar(
+                    radius: 28,
+                    backgroundImage: NetworkImage(images[i]),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  names[i],
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPostCard(Post post) {
     return Container(
-      key: key,
+      key: ValueKey(post.id),
       margin: const EdgeInsets.only(bottom: 12, top: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -282,26 +229,20 @@ class _ExplorePageState extends State<ExplorePage> {
               const CircleAvatar(
                 radius: 20,
                 backgroundImage: NetworkImage(
-                    "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde"),
+                  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde",
+                ),
               ),
               const SizedBox(width: 10),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
-                      color: Colors.black,
-                    ),
+                    post.userName ?? "Unknown",
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Colors.black),
                   ),
                   Text(
-                    username,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
-                    ),
+                    "@${post.userName ?? "user"}",
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
                   ),
                 ],
               ),
@@ -312,31 +253,32 @@ class _ExplorePageState extends State<ExplorePage> {
           const SizedBox(height: 10),
           // Caption
           Text(
-            caption,
+            post.content ?? "",
             style: const TextStyle(fontSize: 14, color: Colors.black),
           ),
           const SizedBox(height: 10),
           // Image
-          ClipRRect(
-            borderRadius: BorderRadius.circular(15),
-            child: image.startsWith('http')
-                ? CachedNetworkImage(
-              imageUrl: image,
-              height: 200,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              placeholder: (context, url) =>
-              const Center(child: CircularProgressIndicator()),
-              errorWidget: (context, url, error) =>
-              const Center(child: Icon(Icons.error, color: Colors.red)),
-            )
-                : Image.file(
-                  File(image),
-                  height: 200,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                 ),
-          ),
+          if (post.images != null && post.images!.isNotEmpty)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(15),
+              child: post.images!.startsWith('http')
+                  ? CachedNetworkImage(
+                imageUrl: post.images!,
+                height: 200,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                placeholder: (context, url) =>
+                const Center(child: CircularProgressIndicator()),
+                errorWidget: (context, url, error) =>
+                const Center(child: Icon(Icons.error, color: Colors.red)),
+              )
+                  : Image.file(
+                File(post.images!),
+                height: 200,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
         ],
       ),
     );
