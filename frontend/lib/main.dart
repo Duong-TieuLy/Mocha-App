@@ -131,6 +131,13 @@ class MyApp extends StatelessWidget {
     UserService(baseUrl: 'http://10.0.2.2:8000')))
             )
         )
+        //   ChangeNotifierProvider(
+        //     create: (_) => MomentViewModel(
+        //       repository: MomentRepository(
+        //         momentService: MomentService(baseUrl: 'http://10.0.2.2:8000')
+        //       ),
+        //     ),
+        //   ),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

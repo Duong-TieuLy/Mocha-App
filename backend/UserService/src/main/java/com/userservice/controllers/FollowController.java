@@ -59,5 +59,3 @@ public class FollowController {
         return ResponseEntity.ok(followService.getFollowStats(firebaseUid));
     }
 }
-
-

@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 @Builder
 public class ReactionDTO {
     private Long id;
-    private Long userId;
+    private String firebaseUid;
     private String reactionType;
     private LocalDateTime createdAt;
 }

@@ -244,6 +244,30 @@ services:
       - mocha-network
     restart: on-failure
 
+  # ==========================
+  # Moment Service (Spring Boot)
+  # ==========================
+  momentservice:
+    build:
+      context: ./backend/MomentService
+      dockerfile: Dockerfile
+    container_name: momentservice
+    ports:
+      - "8086:8086"
+    environment:
+#      USER_SERVICE_BASE_URL: http://userservice:8082/api/users
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/MomentDB
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: YourStrong@Password123
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SERVER_PORT: 8086
+      SPRING_APPLICATION_NAME: MomentService
+    depends_on:
+      - db
+#      - userservice
+    networks:
+      - mocha-network
+    restart: on-failure  # ← Tự động restart nếu fail
 
   # ========================================
   # API GATEWAY
@@ -262,15 +286,15 @@ services:
     networks:
       - mocha-network
     restart: on-failure
-  cloudflared:
-    image: cloudflare/cloudflared:2025.11.1
-    container_name: cloudflared
-    command: tunnel --config /etc/cloudflared/config.yml run
-    volumes:
-      - ./cloudflared:/etc/cloudflared
-    networks:
-      - mocha-network
-    restart: unless-stopped
+#  cloudflared:
+#    image: cloudflare/cloudflared:2025.11.1
+#    container_name: cloudflared
+#    command: tunnel --config /etc/cloudflared/config.yml run
+#    volumes:
+#      - ./cloudflared:/etc/cloudflared
+#    networks:
+#      - mocha-network
+#    restart: unless-stopped
 
 # ========================================
 # NETWORKS & VOLUMES
