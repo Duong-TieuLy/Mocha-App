@@ -65,6 +65,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../data/models/user_profile.dart';
+import '../../data/models/post_model.dart';
 
 class PostCard extends StatelessWidget {
   final String name;

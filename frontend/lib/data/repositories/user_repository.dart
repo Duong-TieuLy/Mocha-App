@@ -1,5 +1,6 @@
 import 'package:frontend/data/services/user_service.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 import '../models/user_profile.dart';
 
@@ -8,12 +9,11 @@ class UserRepository {
 
   UserRepository({required this.userService});
   Future<UserProfile?> getProfile(String uid) async {
-    print('Calling fetchProfile for UID: $uid');
-    final data = await userService.fetchProfile(uid);
-    print('Profile JSON: $data');
-    if (data != null) return UserProfile.fromJson(data);
-    return null;
-  }
+      debugPrint('Calling fetchProfile for UID: $uid');
+      final data = await userService.fetchProfile(uid);
+      debugPrint('Profile JSON: $data');
+      return data != null ? UserProfile.fromJson(data) : null;
+    }
 
   Future<bool> updateProfile(String uid, Map<String, dynamic> updatedData) {
     return userService.updateProfile(uid, updatedData);

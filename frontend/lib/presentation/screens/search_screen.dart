@@ -82,11 +82,11 @@ class _SearchScreenState extends State<SearchScreen> {
                   margin: const EdgeInsets.symmetric(vertical: 8),
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundImage: NetworkImage(user.photoUrl ?? ""),
-                      radius: 25,
-                    ),
-                    title: Text(user.fullName ?? ""),
-                    subtitle: Text(user.email ?? ""),
+                    backgroundImage: NetworkImage(user.photoUrl),
+                    radius: 25,
+                  ),
+                    title: Text(user.fullName),
+                    subtitle: Text(user.email),
 
                     trailing: (user.firebaseUid == uid)
                         ? null // không hiện nút cho chính mình
@@ -114,10 +114,10 @@ class _SearchScreenState extends State<SearchScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => OtherProfileScreen(
-                            userId: user.firebaseUid ?? "",
-                          ),
-                        ),
+                        builder: (_) => OtherProfileScreen(
+                        userId: user.firebaseUid,
+                      ),
+                      ),
                       );
                     },
                   ),
