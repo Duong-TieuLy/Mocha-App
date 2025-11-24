@@ -144,7 +144,7 @@ class PostCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(15),
               child: image!.startsWith('http')
                   ? CachedNetworkImage(
-                imageUrl: image!,
+                imageUrl: image!.replaceFirst("localhost", "10.0.2.2"),
                 height: 200,
                 width: double.infinity,
                 fit: BoxFit.cover,

@@ -1,6 +1,6 @@
-
 import '../models/post_model.dart';
 import '../services/post_service.dart';
+import 'dart:io';
 
 class PostRepository {
   final PostService postService;
@@ -11,7 +11,7 @@ class PostRepository {
     return await postService.fetchAllPosts();
   }
 
-  Future<Post> addPost(Post post) async {
-    return await postService.createPost(post);
+  Future<Post> addPost(String caption, File? image) async {
+    return await postService.createPost(caption, image);
   }
 }

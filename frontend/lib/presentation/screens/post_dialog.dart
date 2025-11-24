@@ -1,180 +1,144 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import 'package:provider/provider.dart';
 
-import '../../data/models/post_model.dart';
-import '../../data/services/post_service.dart';
+import '../view_models/profile_view_model.dart';
 
-// Widget riêng cho dialog đăng post
+
 class PostDialog extends StatefulWidget {
-  // Callback để thông báo khi post được tạo (truyền dữ liệu post mới về ExplorePage)
-  final Function(Map<String, dynamic>) onPostCreated;
-
-  const PostDialog({super.key, required this.onPostCreated});
+  const PostDialog({super.key});
 
   @override
   _PostDialogState createState() => _PostDialogState();
 }
 
 class _PostDialogState extends State<PostDialog> {
-  final ImagePicker _picker = ImagePicker();
-  File? _selectedImage;
   final TextEditingController _captionController = TextEditingController();
+  File? _selectedImage;
+  final ImagePicker _picker = ImagePicker();
 
-  // Hàm chọn ảnh
+  bool _isUploading = false;
+  bool _isPickingImage = false; // 🔒 khóa để tránh picker bị gọi nhiều lần
+
+  // Chọn ảnh từ gallery
   Future<void> _pickImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        _selectedImage = File(pickedFile.path);
-      });
+    if (_isPickingImage) return; // đã đang pick, không làm gì
+    _isPickingImage = true;
+
+    try {
+      final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      if (pickedFile != null) {
+        setState(() => _selectedImage = File(pickedFile.path));
+      }
+    } catch (e) {
+      print('Error picking image: $e');
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Failed to pick image')));
+    } finally {
+      _isPickingImage = false;
     }
   }
 
-  // Hàm đăng post
-  void _post() async {
-    if (_captionController.text.isNotEmpty || _selectedImage != null) {
-      // Tạo post mới với Map
-      final newPost = {
-        'name': "You", // Giả lập tên người dùng hiện tại
-        'username': "@YourUsername", // Giả lập username
-        'image': _selectedImage?.path ?? "https://via.placeholder.com/300", // Nếu không có ảnh, dùng placeholder
-        'caption': _captionController.text.isNotEmpty ? _captionController.text : "Không có caption",
-        'likes': 0, // Bắt đầu với 0 like
-        'comments': 0, // Bắt đầu với 0 comment
-      };
-      final Post post = Post.fromJson(newPost);
-      // Gọi callback để cập nhật danh sách posts trong ExplorePage
-      widget.onPostCreated(newPost);
-      await PostService(baseUrl: 'http://10.0.2.2:8000').createPost(post);
-      // Reset form
+  // Upload post
+  Future<void> _submit() async {
+    if (_captionController.text.isEmpty && _selectedImage == null) return;
+
+    setState(() => _isUploading = true);
+    try {
+      final postVM = Provider.of<PostViewModel>(context, listen: false);
+      await postVM.createPost(_captionController.text, _selectedImage);
+
+      // Clear và đóng dialog
       _captionController.clear();
-      setState(() {
-        _selectedImage = null;
-      });
-      Navigator.of(context).pop(); // Đóng dialog
+      setState(() => _selectedImage = null);
+      Navigator.of(context).pop();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to upload post: $e')),
+      );
+    } finally {
+      setState(() => _isUploading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20), // Bo tròn giống post card
-      ),
-      child: Container(
-        width: double.infinity,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFD8E8FF), // Màu xanh nhạt giống post card
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header (giống post card, bỏ icon 3 chấm)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const CircleAvatar(
-                    radius: 20,
-                    backgroundImage: NetworkImage(
-                        "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde"), // Avatar giả lập
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "You", // Tên người dùng hiện tại
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                          color: Colors.black,
-                        ),
-                      ),
-                      Text(
-                        "@YourUsername", // Username giả lập
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // TextField caption
+            TextField(
+              controller: _captionController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: "Write a caption...",
+                border: InputBorder.none,
               ),
-              const SizedBox(height: 10),
+            ),
+            const SizedBox(height: 10),
 
-              // Caption (dùng TextField để nhập, giống post card nhưng có thể edit)
-              TextField(
-                controller: _captionController,
-                decoration: const InputDecoration(
-                  hintText: 'Write a caption...',
-                  border: InputBorder.none, // Loại bỏ border để giống Text trong post
-                  hintStyle: TextStyle(fontSize: 14, color: Colors.grey),
+            // Preview ảnh hoặc tap chọn
+            _selectedImage != null
+                ? ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.file(
+                _selectedImage!,
+                height: 200,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            )
+                : GestureDetector(
+              onTap: _pickImage,
+              child: Container(
+                height: 200,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                style: const TextStyle(fontSize: 14, color: Colors.black),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 10),
-
-              // Ảnh preview (giống post card, nhưng "No Image selected" có thể nhấp để chọn ảnh)
-              if (_selectedImage != null)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(15),
-                  child: Image.file(
-                    _selectedImage!,
-                    height: 200,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
-                )
-              else
-                GestureDetector(
-                  onTap: _pickImage, // Nhấp vào để chọn ảnh
-                  child: Container(
-                    height: 200,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'No image selected\n(Tap to select)',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ),
+                child: const Center(
+                  child: Text(
+                    "Tap to select image",
+                    style: TextStyle(color: Colors.grey),
                   ),
                 ),
-              const SizedBox(height: 12),
-
-              // Nút Post ở cuối (bỏ row like/comment/share)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text('Cancel'),
-                  ),
-                  ElevatedButton(
-                    onPressed: _post,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('Post'),
-                  ),
-                ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 12),
+
+            // Nút Cancel & Post
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: _isUploading ? null : () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: _isUploading ? null : _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                  ),
+                  child: _isUploading
+                      ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                      : const Text('Post'),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

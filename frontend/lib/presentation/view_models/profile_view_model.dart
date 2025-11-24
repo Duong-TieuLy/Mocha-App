@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:frontend/presentation/view_models/user_view_model.dart';
 
@@ -47,19 +49,13 @@ class PostViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> createPost(Post post) async {
+  Future<void> createPost(String caption, File? image) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      final newPost = await repository.addPost(post);
+      final newPost = await repository.addPost(caption, image);
       _posts.insert(0, newPost);
-
-      final uid = newPost.firebaseUid;
-      if (!_userProfiles.containsKey(uid)) {
-        final profile = await userVM.repository.getProfile(uid);
-        if (profile != null) _userProfiles[uid] = profile;
-      }
     } catch (e) {
       _error = e.toString();
     } finally {

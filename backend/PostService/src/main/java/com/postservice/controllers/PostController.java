@@ -5,9 +5,13 @@ import com.postservice.models.Post;
 import com.postservice.services.PostService;
 import com.postservice.services.ReactionService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
 
@@ -43,16 +47,44 @@ public class PostController {
     }
 
     @PostMapping
-    public ResponseEntity<?> createPost(@RequestBody PostRequest postRequest) {
+    public ResponseEntity<?> createPost(
+            @RequestParam("caption") String caption,
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            @RequestHeader("X-User-Id") String firebaseUid) {
+
+        List<String> imageUrls = new ArrayList<>();
+        String uploadDir = System.getProperty("user.dir") + "/uploads";
+        File uploadFolder = new File(uploadDir);
+
+        if (!uploadFolder.exists() && !uploadFolder.mkdirs()) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Could not create upload folder");
+        }
+
+        if (image != null && !image.isEmpty()) {
+            String fileName = System.currentTimeMillis() + "_" + image.getOriginalFilename();
+            File dest = new File(uploadFolder, fileName);
+
+            try {
+                image.transferTo(dest);
+                String baseUrl = "http://localhost:8084";
+                imageUrls.add(baseUrl + "/uploads/" + fileName);
+            } catch (IOException e) {
+                e.printStackTrace();
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Could not save image");
+            }
+        }
+
         Post post = new Post();
-        post.setFirebaseUid(postRequest.getFirebaseUid());
-        post.setContent(postRequest.getContent());
-        post.setImages(postRequest.getImages());
+        post.setFirebaseUid(firebaseUid);
+        post.setContent(caption);
+        post.setImages(imageUrls.isEmpty() ? null : String.join(",", imageUrls));
         post.setCreatedAt(Instant.now());
 
         Post savedPost = postService.createPost(post);
 
-        return ResponseEntity.ok(savedPost);
+        return ResponseEntity.status(HttpStatus.CREATED).body(savedPost);
     }
 
 
