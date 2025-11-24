@@ -4,6 +4,8 @@ import 'chat_detail_screen.dart';
 import 'package:frontend/chat/message_api.dart';
 import 'package:frontend/data/services/user_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:frontend/chat/group_api.dart';
+import 'package:frontend/chat/create_group_screen.dart';
 
 class ChatPreview {
   final String conversationId;
@@ -86,6 +88,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   List<ChatPreview> _friends = [];
   List<ChatPreview> _chats = [];
+  List<Map<String, dynamic>> _groups = []; // ← Thêm biến này
+  bool _isLoadingGroups = false;
 
   List<ChatPreview> get _filteredChats {
     if (_searchQuery.isEmpty) return _chats;
@@ -120,7 +124,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             final friend = ChatPreview(
               conversationId: "",
               name: u["fullName"] ?? u["username"] ?? "Unknown",
-              avatar: u["photoUrl"] ?? "assets/images/default.png",
+              avatar: u["photoUrl"] ?? "https://ui-avatars.com/api/?name=Unknown&background=random",
               userId: u["firebaseUid"] ?? "unknown",
             );
             debugPrint('║   • ${friend.name} (${friend.userId})');
@@ -164,6 +168,49 @@ class _ChatListScreenState extends State<ChatListScreen> {
         }
       });
     });
+  }
+
+  /// Load groups từ API
+  Future<void> _loadGroupsFromApi() async {
+    if (_isLoadingGroups) return;
+
+    setState(() => _isLoadingGroups = true);
+
+    try {
+      debugPrint('╔═══════════════════════════════════════╗');
+      debugPrint('║ 📡 LOADING GROUPS FROM API            ║');
+      debugPrint('║ User ID: $_currentUserId              ║');
+      debugPrint('╚═══════════════════════════════════════╝');
+
+      final groups = await GroupApi.getUserGroups(_currentUserId);
+
+      if (mounted) {
+        setState(() {
+          // ✅ Đảm bảo ID có prefix 'group_'
+          _groups = groups.map((group) {
+            final id = group['id'] ?? group['conversationId'] ?? '';
+            if (!id.startsWith('group_')) {
+              group['id'] = 'group_$id';
+            }
+            return group;
+          }).toList();
+        });
+      }
+
+      debugPrint('✅ Loaded ${_groups.length} groups');
+
+      if (_groups.isNotEmpty) {
+        for (var group in _groups) {
+          debugPrint('  • ${group['name']} (ID: ${group['id']}, ${(group['memberIds'] as List?)?.length ?? 0} members)');
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading groups: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingGroups = false);
+      }
+    }
   }
 
   @override
@@ -212,11 +259,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
       await _loadFriendsFromApi();
       await _loadChatsFromApi();
+      await _loadGroupsFromApi(); // ← THÊM DÒNG NÀY
 
       debugPrint('╔═══════════════════════════════════════╗');
       debugPrint('║ ✅ App Data Initialized               ║');
       debugPrint('║ Friends loaded: ${_friends.length}     ║');
       debugPrint('║ Chats loaded: ${_chats.length}         ║');
+      debugPrint('║ Groups loaded: ${_groups.length}       ║'); // ← THÊM DÒNG NÀY
 
       if (_friends.isNotEmpty) {
         debugPrint('║ Friends Details:                      ║');
@@ -293,9 +342,21 @@ class _ChatListScreenState extends State<ChatListScreen> {
         timeoutSeconds: 30,
       );
 
-      if (conversations.isEmpty) {
+      // ✅ THÊM FILTER NÀY: Chỉ lấy 1-1 chat, loại bỏ group chat
+      final oneOnOneConversations = conversations.where((conv) {
+        final conversationId = conv['conversationId'] ?? '';
+        final isGroupChat = conversationId.startsWith('group_');
+
+        if (isGroupChat && !silent) {
+          debugPrint('⚠️ Filtering out group chat: $conversationId');
+        }
+
+        return !isGroupChat; // Chỉ giữ lại các cuộc trò chuyện KHÔNG phải group
+      }).toList();
+
+      if (oneOnOneConversations.isEmpty) {
         if (!silent) {
-          debugPrint('║ ℹ️  API returned empty conversations');
+          debugPrint('║ ℹ️  API returned empty 1-1 conversations');
         }
 
         if (!_hasInitialized && _chats.isEmpty) {
@@ -319,7 +380,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       // ✅ FIX: Explicitly type and use complete mapping
       final List<ChatPreview> apiChats = [];
 
-      for (var conv in conversations) {
+      for (var conv in oneOnOneConversations) { // ← ĐỔI conversations → oneOnOneConversations
         try {
           // Get other user ID
           final participants = conv['participants'] as List?;
@@ -391,6 +452,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
           _chats = apiChats;
           _hasInitialized = true;
         });
+      }
+
+      if (!silent) {
+        debugPrint('║ ✅ Loaded ${apiChats.length} 1-1 chats from API (filtered out ${conversations.length - oneOnOneConversations.length} group chats)');
+        debugPrint('╚═══════════════════════════════════════╝');
       }
 
       if (!silent) {
@@ -555,6 +621,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
   void _updateChatPreview(String conversationId, String lastMessage, {bool isTyping = false, DateTime? messageTime}) {
     if (conversationId.isEmpty) return;
 
+    if (conversationId.startsWith('group_')) {
+        debugPrint('⚠️ Ignoring group chat update in _updateChatPreview');
+        return;
+      }
     String displayMessage = lastMessage;
     if (lastMessage.startsWith('http') && (lastMessage.contains('.jpg') ||
         lastMessage.contains('.jpeg') || lastMessage.contains('.png') ||
@@ -900,22 +970,118 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                                               }
 
                                                               void _showNewChatDialog() {
-                                                                showDialog(
-                                                                  context: context,
-                                                                  builder: (context) => AlertDialog(
-                                                                    title: const Text('New Chat'),
-                                                                    content: const Text(
-                                                                      'Feature coming soon!\n\nYou will be able to:\n• Search for users\n• Start new conversations\n• Create group chats',
-                                                                    ),
-                                                                    actions: [
-                                                                      TextButton(
-                                                                        onPressed: () => Navigator.pop(context),
-                                                                        child: const Text('OK'),
+                                                                  showDialog(
+                                                                    context: context,
+                                                                    builder: (context) => AlertDialog(
+                                                                      title: const Text('New Message'),
+                                                                      content: Column(
+                                                                        mainAxisSize: MainAxisSize.min,
+                                                                        children: [
+                                                                          ListTile(
+                                                                            leading: const Icon(Icons.person_add, color: Colors.blue),
+                                                                            title: const Text('New Chat'),
+                                                                            subtitle: const Text('Start a direct conversation'),
+                                                                            onTap: () {
+                                                                              Navigator.pop(context);
+                                                                              _showFriendSelectionDialog();
+                                                                            },
+                                                                          ),
+                                                                          const Divider(),
+                                                                          ListTile(
+                                                                            leading: const Icon(Icons.group_add, color: Colors.green),
+                                                                            title: const Text('New Group'),
+                                                                            subtitle: const Text('Create a group chat'),
+                                                                            onTap: () {
+                                                                              Navigator.pop(context);
+
+                                                                              final friendsList = _friends.map((friend) => {
+                                                                                'firebaseUid': friend.userId,
+                                                                                'fullName': friend.name,
+                                                                                'username': friend.name,
+                                                                                'photoUrl': friend.avatar,
+                                                                              }).toList();
+
+                                                                              Navigator.push(
+                                                                                context,
+                                                                                MaterialPageRoute(
+                                                                                  builder: (context) => CreateGroupScreen(
+                                                                                    currentUserId: _currentUserId,
+                                                                                    friends: friendsList,
+                                                                                  ),
+                                                                                ),
+                                                                              ).then((result) {                      // ← THAY _ BẰNG result
+                                                                                if (result != null && result['success'] == true) {
+                                                                                  _loadGroupsFromApi();               // ← Load groups
+                                                                                  setState(() {
+                                                                                    _selectedTab = 1;                 // ← Switch to Groups tab
+                                                                                  });
+
+                                                                                  final groupName = result['groupName'] ?? 'Group';
+                                                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                                                    SnackBar(
+                                                                                      content: Text('✅ Group "$groupName" created!'),
+                                                                                      backgroundColor: Colors.green,
+                                                                                      duration: const Duration(seconds: 2),
+                                                                                    ),
+                                                                                  );
+                                                                                }
+                                                                              });
+                                                                            },
+                                                                          ),
+
+                                                                        ],
                                                                       ),
-                                                                    ],
-                                                                  ),
-                                                                );
-                                                              }
+                                                                      actions: [
+                                                                        TextButton(
+                                                                          onPressed: () => Navigator.pop(context),
+                                                                          child: const Text('Cancel'),
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                                  );
+                                                                }
+
+                                                                void _showFriendSelectionDialog() {
+                                                                  showDialog(
+                                                                    context: context,
+                                                                    builder: (context) => AlertDialog(
+                                                                      title: const Text('Select Friend'),
+                                                                      content: SizedBox(
+                                                                        width: double.maxFinite,
+                                                                        height: 400,
+                                                                        child: _friends.isEmpty
+                                                                            ? const Center(
+                                                                                child: Text('No friends available'),
+                                                                              )
+                                                                            : ListView.builder(
+                                                                                shrinkWrap: true,
+                                                                                itemCount: _friends.length,
+                                                                                itemBuilder: (context, index) {
+                                                                                  final friend = _friends[index];
+                                                                                  return ListTile(
+                                                                                    leading: CircleAvatar(
+                                                                                      backgroundImage: friend.avatar.startsWith('http')
+                                                                                          ? NetworkImage(friend.avatar)
+                                                                                          : AssetImage(friend.avatar) as ImageProvider,
+                                                                                    ),
+                                                                                    title: Text(friend.name),
+                                                                                    onTap: () {
+                                                                                      Navigator.pop(context);
+                                                                                      _openChatWithFriend(friend);
+                                                                                    },
+                                                                                  );
+                                                                                },
+                                                                              ),
+                                                                      ),
+                                                                      actions: [
+                                                                        TextButton(
+                                                                          onPressed: () => Navigator.pop(context),
+                                                                          child: const Text('Cancel'),
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                                  );
+                                                                }
 
                                                               Widget _buildChatsList() {
                                                                 if (_isLoading && _chats.isEmpty) {
@@ -1006,218 +1172,646 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                                               }
 
                                                               Widget _buildEmptyFolder() {
-                                                                return Center(
-                                                                  child: Column(
-                                                                    mainAxisAlignment: MainAxisAlignment.center,
-                                                                    children: [
-                                                                      Icon(Icons.folder_open_outlined, size: 100, color: Colors.grey[400]),
-                                                                      const SizedBox(height: 20),
-                                                                      Text(
-                                                                        'Empty Folder',
-                                                                        style: TextStyle(
-                                                                          fontSize: 24,
-                                                                          fontWeight: FontWeight.bold,
-                                                                          color: Colors.grey[600],
-                                                                        ),
-                                                                      ),
-                                                                      const SizedBox(height: 10),
-                                                                      Text(
-                                                                        'No groups yet',
-                                                                        style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-                                                                      ),
-                                                                    ],
-                                                                  ),
-                                                                );
-                                                              }
+                                                                // Show loading
+                                                                if (_isLoadingGroups) {
+                                                                  return const Center(child: CircularProgressIndicator());
+                                                                }
 
-                                                              Widget _buildStoryCircle(ChatPreview friend) {
-                                                                return GestureDetector(
-                                                                  onTap: () => _openChatWithFriend(friend),
-                                                                  child: Padding(
-                                                                    padding: const EdgeInsets.only(right: 16),
+                                                                // Empty state
+                                                                if (_groups.isEmpty) {
+                                                                  return Center(
                                                                     child: Column(
+                                                                      mainAxisAlignment: MainAxisAlignment.center,
                                                                       children: [
-                                                                        Container(
-                                                                          width: 60,
-                                                                          height: 60,
-                                                                          decoration: BoxDecoration(
-                                                                            shape: BoxShape.circle,
-                                                                            border: Border.all(
-                                                                              color: Colors.blue,
-                                                                              width: 2,
-                                                                            ),
-                                                                          ),
-                                                                          child: ClipOval(
-                                                                            child: friend.avatar.startsWith('http')
-                                                                                ? Image.network(
-                                                                                    friend.avatar,
-                                                                                    fit: BoxFit.cover,
-                                                                                    errorBuilder: (context, error, stackTrace) {
-                                                                                      return CircleAvatar(
-                                                                                        backgroundColor: Colors.grey[300],
-                                                                                        child: Icon(Icons.person, color: Colors.grey[600]),
-                                                                                      );
-                                                                                    },
-                                                                                  )
-                                                                                : Image.asset(
-                                                                                    friend.avatar,
-                                                                                    fit: BoxFit.cover,
-                                                                                    errorBuilder: (context, error, stackTrace) {
-                                                                                      return CircleAvatar(
-                                                                                        backgroundColor: Colors.grey[300],
-                                                                                        child: Icon(Icons.person, color: Colors.grey[600]),
-                                                                                      );
-                                                                                    },
-                                                                                  ),
+                                                                        Icon(Icons.group_outlined, size: 100, color: Colors.grey[400]),
+                                                                        const SizedBox(height: 20),
+                                                                        Text(
+                                                                          'No Groups Yet',
+                                                                          style: TextStyle(
+                                                                            fontSize: 24,
+                                                                            fontWeight: FontWeight.bold,
+                                                                            color: Colors.grey[600],
                                                                           ),
                                                                         ),
-                                                                        const SizedBox(height: 4),
+                                                                        const SizedBox(height: 10),
                                                                         Text(
-                                                                          friend.name,
-                                                                          style: const TextStyle(fontSize: 12),
-                                                                          maxLines: 1,
-                                                                          overflow: TextOverflow.ellipsis,
+                                                                          'Create a group to start chatting',
+                                                                          style: TextStyle(fontSize: 16, color: Colors.grey[500]),
+                                                                        ),
+                                                                        const SizedBox(height: 20),
+                                                                        ElevatedButton.icon(
+                                                                          onPressed: () {
+                                                                            final friendsList = _friends.map((friend) => {
+                                                                              'firebaseUid': friend.userId,
+                                                                              'fullName': friend.name,
+                                                                              'username': friend.name,
+                                                                              'photoUrl': friend.avatar,
+                                                                            }).toList();
+
+                                                                            Navigator.push(
+                                                                              context,
+                                                                              MaterialPageRoute(
+                                                                                builder: (context) => CreateGroupScreen(
+                                                                                  currentUserId: _currentUserId,
+                                                                                  friends: friendsList,
+                                                                                ),
+                                                                              ),
+                                                                            ).then((result) {
+                                                                              if (result != null && result['success'] == true) {
+                                                                                _loadGroupsFromApi();
+                                                                              }
+                                                                            });
+                                                                          },
+                                                                          icon: const Icon(Icons.add),
+                                                                          label: const Text('Create Group'),
+                                                                          style: ElevatedButton.styleFrom(
+                                                                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                                                                          ),
                                                                         ),
                                                                       ],
                                                                     ),
+                                                                  );
+                                                                }
+
+                                                                // Show groups list
+                                                                return RefreshIndicator(
+                                                                  onRefresh: _loadGroupsFromApi,
+                                                                  child: ListView.builder(
+                                                                    itemCount: _groups.length,
+                                                                    itemBuilder: (context, index) {
+                                                                      final group = _groups[index];
+                                                                      return _buildGroupItem(group);
+                                                                    },
                                                                   ),
                                                                 );
                                                               }
+                                                              /// Build group list item
+                                                                /// Build group list item
+                                                                Widget _buildGroupItem(Map<String, dynamic> group) {
+                                                                  final groupId = group['id'] ?? '';
+                                                                  final groupName = group['name'] ?? 'Unnamed Group';
+                                                                  final groupAvatar = group['avatar'];
+                                                                  final memberIds = (group['memberIds'] as List?)?.cast<String>() ?? [];
+                                                                  final memberCount = memberIds.length;
+                                                                  final lastMessage = group['lastMessage'];
+                                                                  final lastTime = group['lastTime'];
 
-                                                              Widget _buildTab(String title, {required bool isSelected}) {
-                                                                return Column(
-                                                                  children: [
-                                                                    Text(
+                                                                  String timeStr = '';
+                                                                  if (lastTime != null) {
+                                                                    try {
+                                                                      final dateTime = DateTime.parse(lastTime.toString());
+                                                                      timeStr = _formatTime(dateTime);
+                                                                    } catch (e) {
+                                                                      timeStr = '';
+                                                                    }
+                                                                  }
+
+                                                                  return ListTile(
+                                                                    onTap: () {
+                                                                      debugPrint('═══════════════════════════════════════');
+                                                                      debugPrint('📱 Opening group: $groupName');
+                                                                      debugPrint('   Group ID: $groupId');
+                                                                      debugPrint('   Members: $memberCount');
+                                                                      debugPrint('═══════════════════════════════════════');
+
+                                                                      // Navigate to group chat screen
+                                                                      Navigator.push(
+                                                                        context,
+                                                                        MaterialPageRoute(
+                                                                          builder: (context) => ChatDetailScreen(
+                                                                            name: groupName,
+                                                                            avatar: groupAvatar ?? '',
+                                                                            status: '$memberCount members',
+                                                                            conversationId: groupId,
+                                                                            currentUserId: _currentUserId,
+                                                                            isGroupChat: true,
+                                                                            onUpdateChatPreview: (id, msg, {isTyping = false}) {
+                                                                              if (!isTyping && msg.isNotEmpty) {
+                                                                                debugPrint('╔═══════════════════════════════════════╗');
+                                                                                debugPrint('║ 🔄 UPDATING GROUP PREVIEW             ║');
+                                                                                debugPrint('║ Group ID: $id');
+                                                                                debugPrint('║ Message: $msg');
+                                                                                debugPrint('╚═══════════════════════════════════════╝');
+
+                                                                                setState(() {
+                                                                                  final groupIndex = _groups.indexWhere((g) => g['id'] == id);
+                                                                                  if (groupIndex != -1) {
+                                                                                    _groups[groupIndex]['lastMessage'] = msg;
+                                                                                    _groups[groupIndex]['lastTime'] = DateTime.now().toIso8601String();
+
+                                                                                    debugPrint('✅ Updated group preview: ${_groups[groupIndex]['name']}');
+                                                                                  } else {
+                                                                                    debugPrint('⚠️ Group not found in list: $id');
+                                                                                  }
+                                                                                });
+                                                                              }
+                                                                            },
+                                                                          ),
+                                                                        ),
+                                                                      ).then((_) {
+                                                                        debugPrint('🔙 Returned from group chat, reloading groups...');
+                                                                        _loadGroupsFromApi();
+                                                                      });
+                                                                    },
+                                                                    // ✅ THÊM onLongPress
+                                                                    onLongPress: () {
+                                                                      _showGroupOptions(groupId, groupName);
+                                                                    },
+                                                                    leading: CircleAvatar(
+                                                                      radius: 28,
+                                                                      backgroundColor: Colors.blue[100],
+                                                                      backgroundImage: groupAvatar != null && groupAvatar.startsWith('http')
+                                                                          ? NetworkImage(groupAvatar)
+                                                                          : null,
+                                                                      child: groupAvatar == null || !groupAvatar.startsWith('http')
+                                                                          ? Icon(Icons.group, color: Colors.blue[700], size: 28)
+                                                                          : null,
+                                                                    ),
+                                                                    title: Text(
+                                                                      groupName,
+                                                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                                                    ),
+                                                                    subtitle: Text(
+                                                                      lastMessage ?? '$memberCount members',
+                                                                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                                                                      maxLines: 1,
+                                                                      overflow: TextOverflow.ellipsis,
+                                                                    ),
+                                                                    trailing: Column(
+                                                                      mainAxisAlignment: MainAxisAlignment.center,
+                                                                      children: [
+                                                                        if (timeStr.isNotEmpty)
+                                                                          Text(
+                                                                            timeStr,
+                                                                            style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                                                                          )
+                                                                        else
+                                                                          Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
+                                                                      ],
+                                                                    ),
+                                                                  );
+                                                                }
+
+                                                                /// Show group options menu
+                                                                void _showGroupOptions(String groupId, String groupName) {
+                                                                  showModalBottomSheet(
+                                                                    context: context,
+                                                                    shape: const RoundedRectangleBorder(
+                                                                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                                                                    ),
+                                                                    builder: (context) => SafeArea(
+                                                                      child: Column(
+                                                                        mainAxisSize: MainAxisSize.min,
+                                                                        children: [
+                                                                          const SizedBox(height: 12),
+                                                                          Container(
+                                                                            width: 40,
+                                                                            height: 4,
+                                                                            decoration: BoxDecoration(
+                                                                              color: Colors.grey[300],
+                                                                              borderRadius: BorderRadius.circular(2),
+                                                                            ),
+                                                                          ),
+                                                                          const SizedBox(height: 20),
+                                                                          Padding(
+                                                                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                                                                            child: Text(
+                                                                              groupName,
+                                                                              style: const TextStyle(
+                                                                                fontSize: 18,
+                                                                                fontWeight: FontWeight.bold,
+                                                                              ),
+                                                                              textAlign: TextAlign.center,
+                                                                            ),
+                                                                          ),
+                                                                          const SizedBox(height: 20),
+                                                                          ListTile(
+                                                                            leading: const Icon(Icons.delete_sweep, color: Colors.red),
+                                                                            title: const Text(
+                                                                              'Xóa toàn bộ đoạn chat',
+                                                                              style: TextStyle(
+                                                                                fontSize: 16,
+                                                                                fontWeight: FontWeight.w500,
+                                                                              ),
+                                                                            ),
+                                                                            subtitle: Text(
+                                                                              'Xóa tất cả tin nhắn trong nhóm này',
+                                                                              style: TextStyle(
+                                                                                fontSize: 12,
+                                                                                color: Colors.grey[600],
+                                                                              ),
+                                                                            ),
+                                                                            onTap: () {
+                                                                              Navigator.pop(context);
+                                                                              _confirmDeleteGroupMessages(groupId, groupName);
+                                                                            },
+                                                                          ),
+                                                                          const Divider(),
+                                                                          ListTile(
+                                                                            leading: Icon(Icons.exit_to_app, color: Colors.orange[700]),
+                                                                            title: const Text(
+                                                                              'Rời nhóm',
+                                                                              style: TextStyle(
+                                                                                fontSize: 16,
+                                                                                fontWeight: FontWeight.w500,
+                                                                              ),
+                                                                            ),
+                                                                            subtitle: Text(
+                                                                              'Rời khỏi nhóm chat này',
+                                                                              style: TextStyle(
+                                                                                fontSize: 12,
+                                                                                color: Colors.grey[600],
+                                                                              ),
+                                                                            ),
+                                                                            onTap: () {
+                                                                              Navigator.pop(context);
+                                                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                                                const SnackBar(
+                                                                                  content: Text('Tính năng đang phát triển'),
+                                                                                  duration: Duration(seconds: 2),
+                                                                                ),
+                                                                              );
+                                                                            },
+                                                                          ),
+                                                                          const SizedBox(height: 12),
+                                                                        ],
+                                                                      ),
+                                                                    ),
+                                                                  );
+                                                                }
+
+                                                                /// Confirm delete all group messages
+                                                                void _confirmDeleteGroupMessages(String groupId, String groupName) {
+                                                                  showDialog(
+                                                                    context: context,
+                                                                    builder: (context) => AlertDialog(
+                                                                      shape: RoundedRectangleBorder(
+                                                                        borderRadius: BorderRadius.circular(16),
+                                                                      ),
+                                                                      title: const Text('Xóa nhóm?'), // ← Đổi text
+                                                                      content: Text(
+                                                                        'Bạn có chắc chắn muốn xóa nhóm "$groupName"?\n\nTất cả tin nhắn và thông tin nhóm sẽ bị xóa vĩnh viễn.',
+                                                                      ),
+                                                                      actions: [
+                                                                        TextButton(
+                                                                          onPressed: () => Navigator.pop(context),
+                                                                          child: const Text('Hủy'),
+                                                                        ),
+                                                                        TextButton(
+                                                                          onPressed: () {
+                                                                            Navigator.pop(context);
+                                                                            _deleteGroupMessages(groupId, groupName);
+                                                                          },
+                                                                          style: TextButton.styleFrom(
+                                                                            foregroundColor: Colors.red,
+                                                                          ),
+                                                                          child: const Text(
+                                                                            'Xóa nhóm',
+                                                                            style: TextStyle(fontWeight: FontWeight.bold),
+                                                                          ),
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                                  );
+                                                                }
+
+                                                                /// Delete all messages in group
+                                                                /// Delete all messages in group
+                                                                /// Delete all messages in group AND remove group from list
+                                                                Future<void> _deleteGroupMessages(String groupId, String groupName) async {
+                                                                  try {
+                                                                    debugPrint('╔═══════════════════════════════════════╗');
+                                                                    debugPrint('║ 🗑️  DELETING GROUP COMPLETELY         ║');
+                                                                    debugPrint('║ Group ID: $groupId');
+                                                                    debugPrint('║ Group Name: $groupName');
+                                                                    debugPrint('╚═══════════════════════════════════════╝');
+
+                                                                    // Show loading
+                                                                    if (mounted) {
+                                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                                        const SnackBar(
+                                                                          content: Row(
+                                                                            children: [
+                                                                              SizedBox(
+                                                                                width: 20,
+                                                                                height: 20,
+                                                                                child: CircularProgressIndicator(
+                                                                                  strokeWidth: 2,
+                                                                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                                                ),
+                                                                              ),
+                                                                              SizedBox(width: 12),
+                                                                              Text('Đang xóa nhóm...'),
+                                                                            ],
+                                                                          ),
+                                                                          duration: Duration(seconds: 30),
+                                                                        ),
+                                                                      );
+                                                                    }
+
+                                                                    // Step 1: Delete all messages
+                                                                    debugPrint('📝 Step 1: Deleting messages...');
+                                                                    await MessageApi.deleteAllMessages(groupId);
+                                                                    debugPrint('✅ Messages deleted');
+
+                                                                    // Step 2: Delete the group itself
+                                                                    debugPrint('📝 Step 2: Deleting group...');
+                                                                    final groupDeleted = await GroupApi.deleteGroup(groupId);
+
+                                                                    // Hide loading
+                                                                    if (mounted) {
+                                                                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                                                    }
+
+                                                                    if (groupDeleted) {
+                                                                      // Step 3: Remove from local state immediately
+                                                                      setState(() {
+                                                                        _groups.removeWhere((g) => g['id'] == groupId);
+                                                                      });
+
+                                                                      debugPrint('✅ Group completely deleted: $groupId');
+                                                                      debugPrint('📊 Remaining groups: ${_groups.length}');
+
+                                                                      if (mounted) {
+                                                                        ScaffoldMessenger.of(context).showSnackBar(
+                                                                          SnackBar(
+                                                                            content: Text('✅ Đã xóa nhóm "$groupName"'),
+                                                                            backgroundColor: Colors.green,
+                                                                            duration: const Duration(seconds: 2),
+                                                                          ),
+                                                                        );
+                                                                      }
+
+                                                                      // Step 4: Reload to sync with backend
+                                                                      await _loadGroupsFromApi();
+                                                                    } else {
+                                                                      debugPrint('⚠️ Failed to delete group from backend');
+
+                                                                      if (mounted) {
+                                                                        ScaffoldMessenger.of(context).showSnackBar(
+                                                                          const SnackBar(
+                                                                            content: Text('⚠️ Không thể xóa nhóm. Vui lòng thử lại.'),
+                                                                            backgroundColor: Colors.orange,
+                                                                            duration: Duration(seconds: 3),
+                                                                          ),
+                                                                        );
+                                                                      }
+                                                                    }
+                                                                  } catch (e) {
+                                                                    debugPrint('❌ Error deleting group: $e');
+
+                                                                    if (mounted) {
+                                                                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                                        SnackBar(
+                                                                          content: Text('❌ Lỗi: $e'),
+                                                                          backgroundColor: Colors.red,
+                                                                          duration: const Duration(seconds: 3),
+                                                                        ),
+                                                                      );
+                                                                    }
+                                                                  }
+                                                                }
+
+                                                                Widget _buildStoryCircle(ChatPreview friend) {
+                                                                  return GestureDetector(
+                                                                    onTap: () => _openChatWithFriend(friend),
+                                                                    child: Container(
+                                                                      margin: const EdgeInsets.only(right: 12),
+                                                                      width: 70,
+                                                                      child: Column(
+                                                                        children: [
+                                                                          Container(
+                                                                            width: 64,
+                                                                            height: 64,
+                                                                            decoration: BoxDecoration(
+                                                                              shape: BoxShape.circle,
+                                                                              gradient: LinearGradient(
+                                                                                colors: [Colors.purple.shade400, Colors.orange.shade400],
+                                                                                begin: Alignment.topLeft,
+                                                                                end: Alignment.bottomRight,
+                                                                              ),
+                                                                            ),
+                                                                            padding: const EdgeInsets.all(3),
+                                                                            child: CircleAvatar(
+                                                                              backgroundColor: Colors.white,
+                                                                              child: CircleAvatar(
+                                                                                radius: 28,
+                                                                                backgroundImage: friend.avatar.startsWith('http')
+                                                                                    ? NetworkImage(friend.avatar)
+                                                                                    : AssetImage(friend.avatar) as ImageProvider,
+                                                                              ),
+                                                                            ),
+                                                                          ),
+                                                                          const SizedBox(height: 6),
+                                                                          Text(
+                                                                            friend.name,
+                                                                            style: const TextStyle(
+                                                                              fontSize: 12,
+                                                                              fontWeight: FontWeight.w500,
+                                                                            ),
+                                                                            maxLines: 1,
+                                                                            overflow: TextOverflow.ellipsis,
+                                                                            textAlign: TextAlign.center,
+                                                                          ),
+                                                                        ],
+                                                                      ),
+                                                                    ),
+                                                                  );
+                                                                }
+
+                                                                /// Build tab button
+                                                                Widget _buildTab(String title, {required bool isSelected}) {
+                                                                  return Container(
+                                                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                                                    decoration: BoxDecoration(
+                                                                      color: isSelected ? Colors.blue : Colors.transparent,
+                                                                      borderRadius: BorderRadius.circular(20),
+                                                                    ),
+                                                                    child: Text(
                                                                       title,
                                                                       style: TextStyle(
-                                                                        fontSize: 16,
+                                                                        color: isSelected ? Colors.white : Colors.grey[700],
                                                                         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                                                        color: Colors.black,
+                                                                        fontSize: 16,
                                                                       ),
                                                                     ),
-                                                                    const SizedBox(height: 8),
-                                                                    if (isSelected)
-                                                                      Container(
-                                                                        height: 3,
-                                                                        width: 40,
-                                                                        decoration: BoxDecoration(
-                                                                          color: Colors.blue,
-                                                                          borderRadius: BorderRadius.circular(2),
+                                                                  );
+                                                                }
+
+                                                                /// Build chat item in list
+                                                                Widget _buildChatItem(ChatPreview chat) {
+                                                                  return Dismissible(
+                                                                    key: Key(chat.conversationId),
+                                                                    direction: DismissDirection.endToStart,
+                                                                    confirmDismiss: (direction) async {
+                                                                      return await showDialog(
+                                                                        context: context,
+                                                                        builder: (context) => AlertDialog(
+                                                                          title: const Text('Delete Chat'),
+                                                                          content: Text('Delete conversation with ${chat.name}?'),
+                                                                          actions: [
+                                                                            TextButton(
+                                                                              onPressed: () => Navigator.pop(context, false),
+                                                                              child: const Text('Cancel'),
+                                                                            ),
+                                                                            TextButton(
+                                                                              onPressed: () => Navigator.pop(context, true),
+                                                                              style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                                                              child: const Text('Delete'),
+                                                                            ),
+                                                                          ],
                                                                         ),
-                                                                      ),
-                                                                  ],
-                                                                );
-                                                              }
-
-                                                              Widget _buildChatItem(ChatPreview chat) {
-                                                                return ListTile(
-                                                                  onTap: () async {
-                                                                    debugPrint('═══════════════════════════════════════');
-                                                                    debugPrint('📱 Opening existing chat with: ${chat.name}');
-                                                                    debugPrint('   ConversationId: ${chat.conversationId}');
-                                                                    debugPrint('   CurrentUserId: $_currentUserId');
-                                                                    debugPrint('═══════════════════════════════════════');
-
-                                                                    setState(() => _isInChat = true);
-
-                                                                    await Navigator.push(
-                                                                      context,
-                                                                      MaterialPageRoute(
-                                                                        builder: (context) => ChatDetailScreen(
-                                                                          name: chat.name,
-                                                                          avatar: chat.avatar,
-                                                                          status: chat.isTyping ? 'Typing...' : 'Online',
-                                                                          conversationId: chat.conversationId,
-                                                                          currentUserId: _currentUserId,
-                                                                          onUpdateChatPreview: _updateChatPreview,
-                                                                        ),
-                                                                      ),
-                                                                    );
-
-                                                                    setState(() => _isInChat = false);
-                                                                    await _loadChatsFromApi(silent: true);
-                                                                  },
-                                                                  leading: CircleAvatar(
-                                                                    radius: 28,
-                                                                    backgroundColor: Colors.grey[300],
-                                                                    backgroundImage: chat.avatar.startsWith('http')
-                                                                        ? NetworkImage(chat.avatar)
-                                                                        : AssetImage(chat.avatar) as ImageProvider,
-                                                                  ),
-                                                                  title: Text(
-                                                                    chat.name,
-                                                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                                                  ),
-                                                                  subtitle: Text(
-                                                                    chat.lastMessage,
-                                                                    style: TextStyle(
-                                                                      color: chat.isTyping ? Colors.blue : Colors.grey[600],
-                                                                      fontSize: 14,
-                                                                      fontStyle: chat.isTyping ? FontStyle.italic : FontStyle.normal,
+                                                                      );
+                                                                    },
+                                                                    onDismissed: (direction) {
+                                                                      _deleteChat(chat);
+                                                                    },
+                                                                    background: Container(
+                                                                      color: Colors.red,
+                                                                      alignment: Alignment.centerRight,
+                                                                      padding: const EdgeInsets.only(right: 20),
+                                                                      child: const Icon(Icons.delete, color: Colors.white),
                                                                     ),
-                                                                    maxLines: 1,
-                                                                    overflow: TextOverflow.ellipsis,
-                                                                  ),
-                                                                  trailing: Row(
-                                                                    mainAxisSize: MainAxisSize.min,
-                                                                    children: [
-                                                                      Column(
+                                                                    child: ListTile(
+                                                                      onTap: () => _openChatWithFriend(chat),
+                                                                      onLongPress: () {
+                                                                        showModalBottomSheet(
+                                                                          context: context,
+                                                                          builder: (context) => SafeArea(
+                                                                            child: Column(
+                                                                              mainAxisSize: MainAxisSize.min,
+                                                                              children: [
+                                                                                ListTile(
+                                                                                  leading: const Icon(Icons.delete, color: Colors.red),
+                                                                                  title: const Text('Delete Chat'),
+                                                                                  onTap: () {
+                                                                                    Navigator.pop(context);
+                                                                                    _showDeleteChatDialog(chat);
+                                                                                  },
+                                                                                ),
+                                                                                ListTile(
+                                                                                  leading: const Icon(Icons.block, color: Colors.orange),
+                                                                                  title: const Text('Block User'),
+                                                                                  onTap: () {
+                                                                                    Navigator.pop(context);
+                                                                                    _showBlockUserDialog(chat);
+                                                                                  },
+                                                                                ),
+                                                                              ],
+                                                                            ),
+                                                                          ),
+                                                                        );
+                                                                      },
+                                                                      leading: Stack(
+                                                                        children: [
+                                                                          CircleAvatar(
+                                                                            radius: 28,
+                                                                            backgroundColor: Colors.grey[300],
+                                                                            backgroundImage: chat.avatar.startsWith('http')
+                                                                                ? NetworkImage(chat.avatar)
+                                                                                : AssetImage(chat.avatar) as ImageProvider,
+                                                                          ),
+                                                                          if (chat.isLocalUpdate)
+                                                                            Positioned(
+                                                                              right: 0,
+                                                                              bottom: 0,
+                                                                              child: Container(
+                                                                                width: 16,
+                                                                                height: 16,
+                                                                                decoration: BoxDecoration(
+                                                                                  color: Colors.green,
+                                                                                  shape: BoxShape.circle,
+                                                                                  border: Border.all(color: Colors.white, width: 2),
+                                                                                ),
+                                                                              ),
+                                                                            ),
+                                                                        ],
+                                                                      ),
+                                                                      title: Text(
+                                                                        chat.name,
+                                                                        style: TextStyle(
+                                                                          fontWeight: chat.unreadCount > 0 ? FontWeight.bold : FontWeight.w600,
+                                                                          fontSize: 16,
+                                                                        ),
+                                                                      ),
+                                                                      subtitle: chat.isTyping
+                                                                          ? Row(
+                                                                              children: [
+                                                                                Text(
+                                                                                  'typing',
+                                                                                  style: TextStyle(
+                                                                                    color: Colors.blue[600],
+                                                                                    fontSize: 14,
+                                                                                    fontStyle: FontStyle.italic,
+                                                                                  ),
+                                                                                ),
+                                                                                const SizedBox(width: 4),
+                                                                                SizedBox(
+                                                                                  width: 20,
+                                                                                  height: 14,
+                                                                                  child: Row(
+                                                                                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                                                                    children: List.generate(3, (index) {
+                                                                                      return AnimatedContainer(
+                                                                                        duration: const Duration(milliseconds: 300),
+                                                                                        width: 4,
+                                                                                        height: 4,
+                                                                                        decoration: const BoxDecoration(
+                                                                                          color: Colors.blue,
+                                                                                          shape: BoxShape.circle,
+                                                                                        ),
+                                                                                      );
+                                                                                    }),
+                                                                                  ),
+                                                                                ),
+                                                                              ],
+                                                                            )
+                                                                          : Text(
+                                                                              chat.lastMessage,
+                                                                              style: TextStyle(
+                                                                                color: chat.unreadCount > 0 ? Colors.black87 : Colors.grey[600],
+                                                                                fontSize: 14,
+                                                                                fontWeight: chat.unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
+                                                                              ),
+                                                                              maxLines: 1,
+                                                                              overflow: TextOverflow.ellipsis,
+                                                                            ),
+                                                                      trailing: Column(
                                                                         mainAxisAlignment: MainAxisAlignment.center,
+                                                                        crossAxisAlignment: CrossAxisAlignment.end,
                                                                         children: [
                                                                           Text(
                                                                             chat.time,
-                                                                            style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                                                                            style: TextStyle(
+                                                                              color: chat.unreadCount > 0 ? Colors.blue : Colors.grey[500],
+                                                                              fontSize: 12,
+                                                                              fontWeight: chat.unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
+                                                                            ),
                                                                           ),
-                                                                          if (chat.unreadCount > 0)
+                                                                          if (chat.unreadCount > 0) ...[
+                                                                            const SizedBox(height: 4),
                                                                             Container(
-                                                                              margin: const EdgeInsets.only(top: 4),
                                                                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                                               decoration: BoxDecoration(
-                                                                                color: Colors.red,
-                                                                                borderRadius: BorderRadius.circular(12),
+                                                                                color: Colors.blue,
+                                                                                borderRadius: BorderRadius.circular(10),
                                                                               ),
+                                                                              constraints: const BoxConstraints(minWidth: 20),
                                                                               child: Text(
-                                                                                chat.unreadCount.toString(),
-                                                                                style: const TextStyle(color: Colors.white, fontSize: 10),
+                                                                                '${chat.unreadCount}',
+                                                                                style: const TextStyle(
+                                                                                  color: Colors.white,
+                                                                                  fontSize: 12,
+                                                                                  fontWeight: FontWeight.bold,
+                                                                                ),
+                                                                                textAlign: TextAlign.center,
                                                                               ),
                                                                             ),
+                                                                          ],
                                                                         ],
                                                                       ),
-                                                                      PopupMenuButton<String>(
-                                                                        icon: Icon(Icons.more_vert, color: Colors.grey[600], size: 20),
-                                                                        offset: const Offset(0, 40),
-                                                                        onSelected: (value) {
-                                                                          if (value == 'delete') {
-                                                                            _showDeleteChatDialog(chat);
-                                                                          } else if (value == 'block') {
-                                                                            _showBlockUserDialog(chat);
-                                                                          }
-                                                                        },
-                                                                        itemBuilder: (context) => [
-                                                                          const PopupMenuItem(
-                                                                            value: 'delete',
-                                                                            child: Row(
-                                                                              children: [
-                                                                                Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                                                                                SizedBox(width: 12),
-                                                                                Text('Delete Chat', style: TextStyle(color: Colors.red)),
-                                                                              ],
-                                                                            ),
-                                                                          ),
-                                                                          const PopupMenuItem(
-                                                                            value: 'block',
-                                                                            child: Row(
-                                                                              children: [
-                                                                                Icon(Icons.block, color: Colors.orange, size: 20),
-                                                                                SizedBox(width: 12),
-                                                                                Text('Block User', style: TextStyle(color: Colors.orange)),
-                                                                              ],
-                                                                            ),
-                                                                          ),
-                                                                        ],
-                                                                      ),
-                                                                    ],
-                                                                  ),
-                                                                );
+                                                                    ),
+                                                                  );
+                                                                }
                                                               }
-                                                            }
