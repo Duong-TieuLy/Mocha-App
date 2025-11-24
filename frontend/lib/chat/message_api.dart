@@ -85,6 +85,122 @@ class MessageApi {
     }
   }
 
+  // 🆕 CREATE GROUP CHAT
+  static Future<Map<String, dynamic>> createGroup({
+    required String name,
+    required List<String> memberIds,
+    required String createdBy,
+    String? avatar,
+    Map<String, String>? extraHeaders,
+  }) async {
+    try {
+      final headers = {
+        'Content-Type': 'application/json',
+        ...?extraHeaders,
+      };
+
+      final body = {
+        'name': name,
+        'memberIds': memberIds,
+        'createdBy': createdBy,
+        if (avatar != null) 'avatar': avatar,
+      };
+
+      debugPrint('📤 Creating group: $name with ${memberIds.length} members');
+
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/api/conversations/group'),
+            headers: headers,
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        debugPrint('✅ Group created: ${data['conversationId']}');
+        return data;
+      } else {
+        debugPrint('❌ Failed to create group: ${response.statusCode}');
+        return {
+          'success': false,
+          'error': 'Server error: ${response.statusCode}',
+        };
+      }
+    } catch (e) {
+      debugPrint('❌ Error creating group: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    }
+  }
+
+  // 🆕 GET USER'S GROUPS
+  static Future<List<Map<String, dynamic>>> getUserGroups(
+    String userId, {
+    Map<String, String>? extraHeaders,
+  }) async {
+    try {
+      final headers = {
+        'Content-Type': 'application/json',
+        ...?extraHeaders,
+      };
+
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl/api/conversations/groups/$userId'),
+            headers: headers,
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final groups = (data['groups'] as List? ?? [])
+            .map((g) => Map<String, dynamic>.from(g))
+            .toList();
+
+        debugPrint('✅ Loaded ${groups.length} groups for user $userId');
+        return groups;
+      } else {
+        debugPrint('❌ Failed to load groups: ${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading groups: $e');
+      return [];
+    }
+  }
+
+  // 🆕 GET CONVERSATION DETAILS
+  static Future<Map<String, dynamic>?> getConversationDetails(
+    String conversationId, {
+    Map<String, String>? extraHeaders,
+  }) async {
+    try {
+      final headers = {
+        'Content-Type': 'application/json',
+        ...?extraHeaders,
+      };
+
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl/api/conversations/$conversationId/details'),
+            headers: headers,
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['conversation'];
+      } else {
+        return null;
+      }
+    } catch (e) {
+      debugPrint('❌ Error getting conversation details: $e');
+      return null;
+    }
+  }
   // ═══════════════════════════════════════════════════════════════
   // 🛠️ HELPER: Detect image MIME type from filename
   // ═══════════════════════════════════════════════════════════════

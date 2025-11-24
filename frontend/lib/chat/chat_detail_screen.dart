@@ -17,6 +17,7 @@ class ChatDetailScreen extends StatefulWidget {
   final String status;
   final String conversationId;
   final String currentUserId;
+  final bool isGroupChat; // ← THÊM DÒNG NÀY
   final Map<String, String>? extraHeaders;
   final Function(String conversationId, String lastMessage, {bool isTyping})? onUpdateChatPreview;
 
@@ -27,6 +28,7 @@ class ChatDetailScreen extends StatefulWidget {
     this.status = 'Online',
     required this.conversationId,
     required this.currentUserId,
+    this.isGroupChat = false, // ← THÊM DÒNG NÀY (default = false)
     this.extraHeaders,
     this.onUpdateChatPreview,
   });
