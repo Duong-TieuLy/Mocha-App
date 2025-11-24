@@ -70,3 +70,4 @@ mssql-data/
 *.tmp
 cloudflared/*.json
 cloudflared/cert.pem
+*/target/
