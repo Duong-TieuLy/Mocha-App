@@ -38,7 +38,7 @@ class CongratulationsScreen extends StatelessWidget {
                   const SizedBox(height: 32),
                   ElevatedButton(
                     onPressed: () =>
-                        Navigator.pushNamed(context, '/complete-profile'),
+                        Navigator.pushNamed(context, '/login'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2196F3),
                       shape: RoundedRectangleBorder(

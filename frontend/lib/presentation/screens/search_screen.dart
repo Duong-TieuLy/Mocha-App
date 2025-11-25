@@ -71,7 +71,7 @@ class _SearchScreenState extends State<SearchScreen> {
               itemBuilder: (context, index) {
                 final UserProfile user = vm.searchResults[index];
                 final int targetId = user.id; // id của user trong DB
-
+                print("targetId: $targetId");
                 // Lấy trạng thái follow từ ViewModel
                 final bool isFollowed = vm.isFollowing(targetId);
 

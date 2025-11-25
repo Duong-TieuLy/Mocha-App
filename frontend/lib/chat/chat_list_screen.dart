@@ -112,7 +112,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       debugPrint('║ Current User ID: $_currentUserId      ║');
       debugPrint('╚═══════════════════════════════════════╝');
 
-      final data = await _userService.getFriends(_currentUserId);
+      final data = await _userService.getFollowers(_currentUserId);
 
       debugPrint('╔═══════════════════════════════════════╗');
       debugPrint('║ ✅ Friends API Response               ║');
